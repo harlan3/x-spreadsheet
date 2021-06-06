@@ -85,7 +85,7 @@ export function renderCell(draw, data, rindex, cindex, yoffset = 0) {
     }
     if (style.format) {
       // console.log(data.formatm, '>>', cell.format);
-      cellText = formatm[style.format].render(cellText, formulaParser);
+      cellText = formatm[style.format].render(cellText);
     }
     const font = Object.assign({}, style.font);
     font.size = getFontSizePxByPt(font.size);
