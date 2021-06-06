@@ -95,21 +95,9 @@ class Rows {
     return row.cells[ci];
   }
 
-  // what: all | text | format
-  setCell(ri, ci, cellFields, what = 'all') {
-    // !!! REVISIT THIS. NEED TO SET FIELDS.
-    const row = this.getOrNew(ri);
-    row.cells[ci] = getCellOrNewFromRowAndColumnIndex(row, ci);
-    if (what === 'all') {
-      row.cells[ci] = cellFields;
-    } else if (what === 'text') {
-      row.cells[ci] = getCellOrNewFromRowAndColumnIndex(row, ci);
-      this.setCellTextGivenCell(row.cells[ci], text);
-    } else if (what === 'format') {
-      row.cells[ci] = getCellOrNewFromRowAndColumnIndex(row, ci);
-      row.cells[ci].style = cellFields.style;
-      if (cellFields.merge) row.cells[ci].merge = cellFields.merge;
-    }
+  setCell(ri, ci, fieldInfo, what) {
+    const cell = this.getCellOrNew(ri, ci);
+    cell.set(this.dataProxy, fieldInfo, what);
   }
 
   setCellTextGivenCell(cell, text) {
@@ -323,21 +311,14 @@ class Rows {
 
   // what: all | text | format | merge
   deleteCell(ri, ci, what = 'all') {
-    // !!! WHAT DO HERE?
     const row = this.get(ri);
     if (row !== null) {
       const cell = this.getCell(ri, ci);
-      if (cell !== null && cell.editable !== false) {
+      if (cell && cell.isEditable()) {
         if (what === 'all') {
           delete row.cells[ci];
-        } else if (what === 'text') {
-          if (cell.text) delete cell.text;
-          if (cell.value) delete cell.value;
-        } else if (what === 'format') {
-          if (cell.style !== undefined) delete cell.style;
-          if (cell.merge) delete cell.merge;
-        } else if (what === 'merge') {
-          if (cell.merge) delete cell.merge;
+        } else {
+          cell.delete(this.dataProxy, what);
         }
       }
     }

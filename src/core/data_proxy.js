@@ -1177,7 +1177,7 @@ export default class DataProxy {
           if (rowsProperty !== 'len') {
             // Map all cell JSON data into Cell objects
             Object.keys(d.rows[rowsProperty].cells).forEach((columnIndex) => {
-              d.rows[rowsProperty].cells[columnIndex] = new Cell(d.rows[rowsProperty].cells[columnIndex]);
+              d.rows[rowsProperty].cells[columnIndex] = new Cell(this.dataProxy, d.rows[rowsProperty].cells[columnIndex]);
             });
           }
         });

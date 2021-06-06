@@ -20,20 +20,68 @@ const cellRender = (src, formulaParser) => {
 };
 
 class Cell {
-  constructor(properties) {
+  constructor(dataProxy, properties) {
     this.value = null;
+
+    if (dataProxy === undefined && properties === undefined)
+      return;
 
     // Properties that may exist:
     // - text
     // - style
     // - merge
     // - editable
-    Object.assign(this, properties);
+    this.set(dataProxy, properties);
   }
 
   setText(dataProxy, text) {
+    if (!this.isEditable())
+      return;
+
     this.text = text;
     // Call dataProxy, ask it to recalculate everything
+  }
+
+  set(dataProxy, fieldInfo, what = 'all') {
+    if (!this.isEditable())
+      return;
+
+    if (what === 'all') {
+      Object.keys(fieldInfo).forEach((fieldName) => {
+        if (fieldName === 'text') {
+          this.setText(dataProxy, fieldInfo.text);
+        } else {
+          this[fieldName] = fieldInfo[fieldName];
+        }
+      });
+    } else if (what === 'text') {
+      this.setText(dataProxy, fieldInfo.text);
+    } else if (what === 'format') {
+      this.style = fieldInfo.style;
+      if (this.merge) this.merge = fieldInfo.merge;
+    }
+  }
+
+  isEditable() {
+    return this.editable !== false;
+  }
+
+  delete(dataProxy, what) {
+    if (!this.isEditable())
+      return;
+
+    // Note: deleting the cell (what === 'all') needs to be handled at a
+    // higher level (the row object).
+    if (what === 'text') {
+      if (this.text) delete this.text;
+      if (this.value) delete this.value;
+      // TODO!!: Call dataProxy to update values of dependencies
+    } else if (what === 'format') {
+      if (this.style !== undefined) delete this.style;
+      if (this.merge) delete this.merge;
+    } else if (what === 'merge') {
+      if (this.merge) delete this.merge;
+    }
   }
 
   getText() {
