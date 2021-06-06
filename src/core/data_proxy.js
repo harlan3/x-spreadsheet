@@ -9,6 +9,7 @@ import { Merges } from './merge';
 import helper from './helper';
 import { Rows } from './row';
 import { Cols } from './col';
+import { Cell } from './cell';
 import { Validations } from './validation';
 import { CellRange } from './cell_range';
 import { expr2xy, xy2expr } from './alphabet';
@@ -330,7 +331,7 @@ export default class DataProxy {
     this.freeze = [0, 0];
     this.styles = []; // Array<Style>
     this.merges = new Merges(); // [CellRange, ...]
-    this.rows = new Rows(this.settings.row);
+    this.rows = new Rows(this, this.settings.row);
     this.cols = new Cols(this.settings.col);
     this.validations = new Validations();
     this.hyperlinks = {};
@@ -417,7 +418,7 @@ export default class DataProxy {
             copyText += '\t'
           }
           if (rowData[ri].cells.hasOwnProperty(ci)) {
-            var cellText = String(rowData[ri].cells[ci].text)
+            var cellText = String(rowData[ri].cells[ci].getText())
             if ((cellText.indexOf("\n") == -1) && (cellText.indexOf("\t") == -1) && (cellText.indexOf("\"") == -1)) {
               copyText += cellText;
             } else {
@@ -544,15 +545,15 @@ export default class DataProxy {
           if (rn > 1) {
             for (let i = sci; i <= eci; i += 1) {
               const cell = rows.getCellOrNew(eri + 1, i);
-              cell.text = `=${value}(${xy2expr(i, sri)}:${xy2expr(i, eri)})`;
+              cell.setText(this, `=${value}(${xy2expr(i, sri)}:${xy2expr(i, eri)})`);
             }
           } else if (cn > 1) {
             const cell = rows.getCellOrNew(ri, eci + 1);
-            cell.text = `=${value}(${xy2expr(sci, ri)}:${xy2expr(eci, ri)})`;
+            cell.setText(this, `=${value}(${xy2expr(sci, ri)}:${xy2expr(eci, ri)})`);
           }
         } else {
           const cell = rows.getCellOrNew(ri, ci);
-          cell.text = `=${value}()`;
+          cell.setText(this, `=${value}()`);
         }
       } else {
         selector.range.each((ri, ci) => {
@@ -593,7 +594,7 @@ export default class DataProxy {
       nri = this.unsortedRowMap.get(ri);
     }
     const oldCell = rows.getCell(nri, ci);
-    const oldText = oldCell ? oldCell.text : '';
+    const oldText = (oldCell !== undefined) ? oldCell.getText() : '';
     this.setCellText(nri, ci, text, state);
     // replace filter.value
     if (autoFilter.active()) {
@@ -941,7 +942,9 @@ export default class DataProxy {
 
   getCellTextOrDefault(ri, ci) {
     const cell = this.getCell(ri, ci);
-    return (cell && cell.text) ? cell.text : '';
+    if (!cell) return '';
+
+    return cell.getText();
   }
 
   getCellStyle(ri, ci) {
@@ -1167,9 +1170,18 @@ export default class DataProxy {
 
   setData(d) {
     Object.keys(d).forEach((property) => {
-      if (property === 'merges' || property === 'rows'
-        || property === 'cols' || property === 'validations') {
+      if (property === 'merges' || property === 'cols' || property === 'validations') {
         this[property].setData(d[property]);
+      } else if (property === 'rows') {
+        Object.keys(d.rows).forEach((rowsProperty) => {
+          if (rowsProperty !== 'len') {
+            // Map all cell JSON data into Cell objects
+            Object.keys(d.rows[rowsProperty].cells).forEach((columnIndex) => {
+              d.rows[rowsProperty].cells[columnIndex] = new Cell(d.rows[rowsProperty].cells[columnIndex]);
+            });
+          }
+        });
+        this.rows.setData(d.rows);
       } else if (property === 'freeze') {
         const [x, y] = expr2xy(d[property]);
         this.freeze = [y, x];

@@ -77,11 +77,9 @@ export function renderCell(draw, data, rindex, cindex, yoffset = 0) {
   }
   draw.rect(dbox, () => {
     // render text
-    let cellText = "";
+    let cellText = cell.getText();
     if(!data.settings.evalPaused) {
-      cellText = _cell.render(cell.text || '', formulaParser);
-    } else {
-      cellText = cell.text || '';
+      cellText = _cell.render(cellText, formulaParser);
     }
     if (style.format) {
       // console.log(data.formatm, '>>', cell.format);

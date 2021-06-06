@@ -1,9 +1,15 @@
 import helper from './helper';
+import { Cell } from './cell';
 import { expr2expr, REGEX_EXPR_GLOBAL } from './alphabet';
 
+function getCellOrNewFromRowAndColumnIndex(row, ci) {
+  return row.cells[ci] || new Cell();
+}
+
 class Rows {
-  constructor({ len, height }) {
+  constructor(dataProxy, { len, height }) {
     this._ = {};
+    this.dataProxy = dataProxy;
     this.len = len;
     // default row height
     this.height = height;
@@ -85,28 +91,36 @@ class Rows {
 
   getCellOrNew(ri, ci) {
     const row = this.getOrNew(ri);
-    row.cells[ci] = row.cells[ci] || {};
+    row.cells[ci] = getCellOrNewFromRowAndColumnIndex(row, ci);
     return row.cells[ci];
   }
 
   // what: all | text | format
-  setCell(ri, ci, cell, what = 'all') {
+  setCell(ri, ci, cellFields, what = 'all') {
+    // !!! REVISIT THIS. NEED TO SET FIELDS.
     const row = this.getOrNew(ri);
+    row.cells[ci] = getCellOrNewFromRowAndColumnIndex(row, ci);
     if (what === 'all') {
-      row.cells[ci] = cell;
+      row.cells[ci] = cellFields;
     } else if (what === 'text') {
-      row.cells[ci] = row.cells[ci] || {};
-      row.cells[ci].text = cell.text;
+      row.cells[ci] = getCellOrNewFromRowAndColumnIndex(row, ci);
+      this.setCellTextGivenCell(row.cells[ci], text);
     } else if (what === 'format') {
-      row.cells[ci] = row.cells[ci] || {};
-      row.cells[ci].style = cell.style;
-      if (cell.merge) row.cells[ci].merge = cell.merge;
+      row.cells[ci] = getCellOrNewFromRowAndColumnIndex(row, ci);
+      row.cells[ci].style = cellFields.style;
+      if (cellFields.merge) row.cells[ci].merge = cellFields.merge;
+    }
+  }
+
+  setCellTextGivenCell(cell, text) {
+    if (cell.editable !== false) {
+      cell.setText(this.dataProxy, text);
     }
   }
 
   setCellText(ri, ci, text) {
     const cell = this.getCellOrNew(ri, ci);
-    if (cell.editable !== false) cell.text = text;
+    this.setCellTextGivenCell(cell, text);
   }
 
   // what: all | format | text
@@ -137,15 +151,15 @@ class Rows {
                 const nri = ii + (i - sri);
                 const nci = jj + (j - sci);
                 const ncell = helper.cloneDeep(this._[i].cells[j]);
-                // ncell.text
-                if (autofill && ncell && ncell.text && ncell.text.length > 0) {
+                const ncellText = ncell.getText();
+                if (autofill && ncell && ncellText && ncellText.length > 0) {
                   const { text } = ncell;
                   let n = (jj - dsci) + (ii - dsri) + 2;
                   if (!isAdd) {
                     n -= dn + 1;
                   }
                   if (text[0] === '=') {
-                    ncell.text = text.replace(REGEX_EXPR_GLOBAL, (word) => {
+                    ncell.setText(this.dataProxy, text.replace(REGEX_EXPR_GLOBAL, (word) => {
                       let [xn, yn] = [0, 0];
                       if (sri === dsri) {
                         xn = n - 1;
@@ -158,7 +172,7 @@ class Rows {
                       // Set expr2expr to not perform translation on axes with an
                       // absolute reference
                       return expr2expr(word, xn, yn, false);
-                    });
+                    }));
                   } else if ((rn <= 1 && cn > 1 && (dsri > eri || deri < sri))
                     || (cn <= 1 && rn > 1 && (dsci > eci || deci < sci))
                     || (rn <= 1 && cn <= 1)) {
@@ -166,7 +180,7 @@ class Rows {
                     // console.log('result:', result);
                     if (result !== null) {
                       const index = Number(result[0]) + n - 1;
-                      ncell.text = text.substring(0, result.index) + index;
+                      ncell.setText(this.dataProxy, text.substring(0, result.index) + index);
                     }
                   }
                 }
@@ -217,8 +231,12 @@ class Rows {
       if (nri >= sri) {
         nri += n;
         this.eachCells(ri, (ci, cell) => {
-          if (cell.text && cell.text[0] === '=') {
-            cell.text = cell.text.replace(REGEX_EXPR_GLOBAL, word => expr2expr(word, 0, n, true, (x, y) => y >= sri));
+          const cellText = cell.getText();
+          if (cellText && cellText[0] === '=') {
+            cell.setText(
+              this.dataProxy,
+              cellText.replace(REGEX_EXPR_GLOBAL, word => expr2expr(word, 0, n, true, (x, y) => y >= sri))
+            );
           }
         });
       }
@@ -238,8 +256,12 @@ class Rows {
       } else if (ri > eri) {
         ndata[nri - n] = row;
         this.eachCells(ri, (ci, cell) => {
-          if (cell.text && cell.text[0] === '=') {
-            cell.text = cell.text.replace(REGEX_EXPR_GLOBAL, word => expr2expr(word, 0, -n, true, (x, y) => y > eri));
+          const cellText = cell.getText();
+          if (cellText && cellText[0] === '=') {
+            cell.setText(
+              this.dataProxy,
+              cellText.replace(REGEX_EXPR_GLOBAL, word => expr2expr(word, 0, -n, true, (x, y) => y > eri))
+            );
           }
         });
       }
@@ -255,8 +277,12 @@ class Rows {
         let nci = parseInt(ci, 10);
         if (nci >= sci) {
           nci += n;
-          if (cell.text && cell.text[0] === '=') {
-            cell.text = cell.text.replace(REGEX_EXPR_GLOBAL, word => expr2expr(word, n, 0, true, x => x >= sci));
+          const cellText = cell.getText();
+          if (cellText && cellText[0] === '=') {
+            cell.setText(
+              this.dataProxy,
+              cellText.replace(REGEX_EXPR_GLOBAL, word => expr2expr(word, n, 0, true, x => x >= sci))
+            );
           }
         }
         rndata[nci] = cell;
@@ -275,8 +301,12 @@ class Rows {
           rndata[nci] = cell;
         } else if (nci > eci) {
           rndata[nci - n] = cell;
-          if (cell.text && cell.text[0] === '=') {
-            cell.text = cell.text.replace(REGEX_EXPR_GLOBAL, word => expr2expr(word, -n, 0, true, x => x > eci));
+          const cellText = cell.getText();
+          if (cellText && cellText[0] === '=') {
+            cell.setText(
+              this.dataProxy,
+              cellText.replace(REGEX_EXPR_GLOBAL, word => expr2expr(word, -n, 0, true, x => x > eci))
+            );
           }
         }
       });
@@ -293,6 +323,7 @@ class Rows {
 
   // what: all | text | format | merge
   deleteCell(ri, ci, what = 'all') {
+    // !!! WHAT DO HERE?
     const row = this.get(ri);
     if (row !== null) {
       const cell = this.getCell(ri, ci);

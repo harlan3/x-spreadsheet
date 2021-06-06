@@ -130,7 +130,7 @@ export default class AutoFilter {
         for (let i = 0; i < filters.length; i += 1) {
           const filter = filters[i];
           const cell = getCell(ri, filter.ci);
-          const ctext = cell ? cell.text : '';
+          const ctext = (cell !== undefined) ? cell.getText() : '';
           if (!filter.includes(ctext)) {
             rset.add(ri);
             break;
@@ -149,8 +149,9 @@ export default class AutoFilter {
       const { sri, eri } = this.range();
       for (let ri = sri + 1; ri <= eri; ri += 1) {
         const cell = getCell(ri, ci);
-        if (cell !== null && !/^\s*$/.test(cell.text)) {
-          const key = cell.text;
+        const ctext = (cell !== undefined) ? cell.getText() : '';
+        if (cell !== null && !/^\s*$/.test(ctext)) {
+          const key = ctext;
           const cnt = (m[key] || 0) + 1;
           m[key] = cnt;
         } else {

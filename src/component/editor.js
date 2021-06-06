@@ -149,7 +149,7 @@ export default class Editor {
 
   clear() {
     // const { cell } = this;
-    // const cellText = (cell && cell.text) || '';
+    // const cellText = (cell !== undefined) ? cell.getText() : '';
     if (this.inputText !== '') {
       this.change('finished', this.inputText);
     }
@@ -208,7 +208,7 @@ export default class Editor {
     const { el, datepicker, suggest } = this;
     el.show();
     this.cell = cell;
-    const text = (cell && cell.text) || '';
+    const text = (cell !== undefined) ? cell.getText() : '';
     this.setText(text);
 
     this.validator = validator;
