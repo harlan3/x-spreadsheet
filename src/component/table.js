@@ -7,8 +7,6 @@ import {
   Draw, DrawBox, thinLineWidth, npx,
 } from '../canvas/draw';
 
-import { Parser } from 'hot-formula-parser';
-
 // gobal var
 const cellPaddingWidth = 5;
 const tableFixedHeaderCleanStyle = { fillStyle: '#f4f5f8' };
@@ -17,7 +15,7 @@ const tableGridStyle = {
   lineWidth: thinLineWidth,
   strokeStyle: '#e6e6e6',
 };
-const formulaParser = new Parser();
+
 function tableFixedHeaderStyle() {
   return {
     textAlign: 'center',
@@ -61,9 +59,9 @@ export function renderCell(draw, data, rindex, cindex, yoffset = 0) {
   }
 
   const cell = data.getCell(nrindex, cindex);
-  if (cell === null) return;
+  if (!cell) return;
   let frozen = false;
-  if ('editable' in cell && cell.editable === false) {
+  if (!cell.isEditable()) {
     frozen = true;
   }
 
@@ -79,7 +77,7 @@ export function renderCell(draw, data, rindex, cindex, yoffset = 0) {
     // render text
     let cellText = cell.getText();
     if(!data.settings.evalPaused) {
-      cellText = _cell.render(cellText, formulaParser);
+      cellText = cell.getValue();
     }
     if (style.format) {
       // console.log(data.formatm, '>>', cell.format);
@@ -305,62 +303,6 @@ class Table {
     this.el = el;
     this.draw = new Draw(el, data.viewWidth(), data.viewHeight());
     this.data = data;
-
-    const that = this;
-
-    // Whenever formulaParser.parser encounters a cell reference, it will
-    // execute this callback to query the true value of that cell reference.
-    // If the referenced cell contains a formula, we need to use formulaParser
-    // to determine its value---which will then trigger more callCellValue
-    // events to computer the values of its cell references. This recursion
-    // will continue until the original formula is fully resolved.
-    const getFormulaParserCellValue = function(cellCoord) {
-      let cellText = that.data.getCellTextOrDefault(cellCoord.row.index, cellCoord.column.index);
-     
-      // If cell contains a formula, return the result of the formula rather
-      // than the formula text itself
-      if (cellText && cellText.length > 0 && cellText[0] === '=') {
-        const parsedResult = formulaParser.parse(cellText.slice(1));
-
-        // If there's an error, return the error instead of the result
-        return (parsedResult.error) ?
-          parsedResult.error :
-          parsedResult.result;
-      }
-
-      // The cell doesn't contain a formula, so return its contents as a value.
-      // If the string is a number, return as a number;
-      // otherwise, return as a string.
-      return Number(cellText) || cellText;
-    }
-
-    formulaParser.on('callCellValue', function(cellCoord, done) {
-      const cellValue = getFormulaParserCellValue(cellCoord);
-      done(cellValue);
-    });
-
-    formulaParser.on('callRangeValue', function (startCellCoord, endCellCoord, done) {
-      let fragment = [];
-
-      for (let row = startCellCoord.row.index; row <= endCellCoord.row.index; row++) {
-        let colFragment = [];
-
-        for (let col = startCellCoord.column.index; col <= endCellCoord.column.index; col++) {
-          // Copy the parts of the structure of a Parser cell coordinate used
-          // by getFormulaParserCellValue
-          const constructedCellCoord = {
-            row: { index: row },
-            column: { index: col }  
-          };
-          const cellValue = getFormulaParserCellValue(constructedCellCoord);
-
-          colFragment.push(cellValue);
-        }
-        fragment.push(colFragment);
-      }
-
-      done(fragment);
-    })
   }
 
   resetData(data) {

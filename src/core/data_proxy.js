@@ -109,7 +109,6 @@ const defaultSettings = {
 const toolbarHeight = 41;
 const bottombarHeight = 41;
 
-
 // src: cellRange
 // dst: cellRange
 function canPaste(src, dst, error = () => { }) {
@@ -594,7 +593,7 @@ export default class DataProxy {
       nri = this.unsortedRowMap.get(ri);
     }
     const oldCell = rows.getCell(nri, ci);
-    const oldText = (oldCell !== undefined) ? oldCell.getText() : '';
+    const oldText = (oldCell) ? oldCell.getText() : '';
     this.setCellText(nri, ci, text, state);
     // replace filter.value
     if (autoFilter.active()) {
@@ -1177,7 +1176,7 @@ export default class DataProxy {
           if (rowsProperty !== 'len') {
             // Map all cell JSON data into Cell objects
             Object.keys(d.rows[rowsProperty].cells).forEach((columnIndex) => {
-              d.rows[rowsProperty].cells[columnIndex] = new Cell(this.dataProxy, d.rows[rowsProperty].cells[columnIndex]);
+              d.rows[rowsProperty].cells[columnIndex] = new Cell(this, d.rows[rowsProperty].cells[columnIndex]);
             });
           }
         });

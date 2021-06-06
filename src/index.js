@@ -1,6 +1,7 @@
 /* global window, document */
 import { h } from './component/element';
 import DataProxy from './core/data_proxy';
+import { configureCellLookupFunction } from './core/cell';
 import Sheet from './component/sheet';
 import Bottombar from './component/bottombar';
 import { cssPrefix } from './config';
@@ -35,6 +36,11 @@ class Spreadsheet {
     targetEl.appendChild(rootEl.el);
     this.sheet = new Sheet(rootEl, this.data);
     rootEl.child(this.bottombar.el);
+
+    // Necessary for formula interpretation
+    configureCellLookupFunction((ri, ci) => {
+      return this.sheet.table.data.getCell(ri, ci);
+    });
   }
 
   addSheet(name, active = true) {

@@ -324,6 +324,14 @@ class Rows {
     }
   }
 
+  updateCellValues() {
+    this.each((ri) => {
+      this.eachCells(ri, (ci, cell) => {
+        cell.calculateValueFromText();
+      });
+    });
+  }
+
   maxCell() {
     const keys = Object.keys(this._);
     const ri = keys[keys.length - 1];
