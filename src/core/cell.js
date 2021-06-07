@@ -5,8 +5,9 @@ const formulaParser = new Parser();
 let cellLookupFunction = (ri, ci) => { return null; };
 const configureCellLookupFunction = (fn) => { cellLookupFunction = fn; }
 
-let visitMap = {};
-let directParents = [];
+let cellWalkIdToDependencies = {};
+let cellWalkId = 0;
+let cellStack = [];
 let dependencyLevel = 0;
 
 const isFormula = (src) => {
@@ -148,19 +149,25 @@ class Cell {
     console.log('calc value from text', this);
     if (this.text === undefined) return;
 
-    directParents = [];
+    // directParents = [];
     dependencyLevel = 0;
+    cellWalkIdToDependencies = {};
+    cellWalkId = 0;
+
+    cellStack = [];
 
     this.getFormulaParserCellValueFromText(this.text);
-    console.log('full stack', directParents);
+    console.log('full stack', cellStack);
   }
 
   getFormulaParserCellValueFromText(src) {
     console.log('dep', src, dependencyLevel);
 
-    if (dependencyLevel == 1) {
-      directParents.push(this);
-    }
+    // if (dependencyLevel == 1) {
+    //   directParents.push(this);
+    // }
+
+    cellStack.push(this);
 
     if (this.updated) return this.value;
 
@@ -168,7 +175,12 @@ class Cell {
       dependencyLevel++;
 
       const parsedResult = formulaParser.parse(src.slice(1));
-      console.log('parsed', src, ' -> ', parsedResult.result);
+      console.log('parsed', src, ' -> ', parsedResult.result, cellStack);
+
+      // !!!! THIS IS WHERE DEPENDENCIES COME FROM!
+      while (this !== cellStack[cellStack.length - 1]) {
+        console.log('from ', src, ' removed ', cellStack.pop());
+      }
 
       src = (parsedResult.error) ?
                 parsedResult.error :
