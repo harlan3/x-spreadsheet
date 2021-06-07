@@ -546,15 +546,15 @@ export default class DataProxy {
           if (rn > 1) {
             for (let i = sci; i <= eci; i += 1) {
               const cell = rows.getCellOrNew(eri + 1, i);
-              cell.setText(this, `=${value}(${xy2expr(i, sri)}:${xy2expr(i, eri)})`);
+              cell.setText(`=${value}(${xy2expr(i, sri)}:${xy2expr(i, eri)})`);
             }
           } else if (cn > 1) {
             const cell = rows.getCellOrNew(ri, eci + 1);
-            cell.setText(this, `=${value}(${xy2expr(sci, ri)}:${xy2expr(eci, ri)})`);
+            cell.setText(`=${value}(${xy2expr(sci, ri)}:${xy2expr(eci, ri)})`);
           }
         } else {
           const cell = rows.getCellOrNew(ri, ci);
-          cell.setText(this, `=${value}()`);
+          cell.setText(`=${value}()`);
         }
       } else {
         selector.range.each((ri, ci) => {
@@ -1197,7 +1197,7 @@ export default class DataProxy {
           if (rowsProperty !== 'len') {
             // Map all cell JSON data into Cell objects
             Object.keys(d.rows[rowsProperty].cells).forEach((columnIndex) => {
-              d.rows[rowsProperty].cells[columnIndex] = new Cell(this, d.rows[rowsProperty].cells[columnIndex]);
+              d.rows[rowsProperty].cells[columnIndex] = new Cell(rowsProperty, columnIndex, d.rows[rowsProperty].cells[columnIndex]);
             });
           }
         });

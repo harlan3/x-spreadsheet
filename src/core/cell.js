@@ -5,10 +5,7 @@ const formulaParser = new Parser();
 let cellLookupFunction = (ri, ci) => { return null; };
 const configureCellLookupFunction = (fn) => { cellLookupFunction = fn; }
 
-let cellWalkIdToDependencies = {};
-let cellWalkId = 0;
 let cellStack = [];
-let dependencyLevel = 0;
 
 const isFormula = (src) => {
   return src && src.length > 0 && src[0] === '=';
@@ -58,11 +55,13 @@ formulaParser.on('callRangeValue', function (startCellCoord, endCellCoord, done)
 });
 
 class Cell {
-  constructor(dataProxy, properties) {
+  constructor(ri, ci, properties) {
+    this.ri = ri;
+    this.ci = ci;
     this.value = null;
     this.updated = true;
 
-    if (dataProxy === undefined && properties === undefined)
+    if (properties === undefined)
       return;
 
     // Properties that may exist:
@@ -70,12 +69,12 @@ class Cell {
     // - style
     // - merge
     // - editable
-    this.set(dataProxy, properties);
+    this.set(properties);
 
-    this.deps = {};
+    this.uses = [];
   }
 
-  setText(dataProxy, text) {
+  setText(text) {
     if (!this.isEditable())
       return;
 
@@ -83,25 +82,22 @@ class Cell {
     this.updated = false;
 
     this.calculateValueFromText();
-    // Call dataProxy, ask it to recalculate everything
-    // TODO: Improve by only updating dependencies
-    // dataProxy.rows.updateCellValues();
   }
 
-  set(dataProxy, fieldInfo, what = 'all') {
+  set(fieldInfo, what = 'all') {
     if (!this.isEditable())
       return;
 
     if (what === 'all') {
       Object.keys(fieldInfo).forEach((fieldName) => {
         if (fieldName === 'text') {
-          this.setText(dataProxy, fieldInfo.text);
+          this.setText(fieldInfo.text);
         } else {
           this[fieldName] = fieldInfo[fieldName];
         }
       });
     } else if (what === 'text') {
-      this.setText(dataProxy, fieldInfo.text);
+      this.setText(fieldInfo.text);
     } else if (what === 'format') {
       this.style = fieldInfo.style;
       if (this.merge) this.merge = fieldInfo.merge;
@@ -112,7 +108,7 @@ class Cell {
     return this.editable !== false;
   }
 
-  delete(dataProxy, what) {
+  delete(what) {
     if (!this.isEditable())
       return;
 
@@ -123,9 +119,7 @@ class Cell {
       if (this.value) delete this.value;
       this.updated = true;
 
-      // Call dataProxy, ask it to recalculate everything
-      // TODO: Improve by only updating dependencies
-      dataProxy.rows.updateCellValues();
+      // TODO: Update dependencies
     } else if (what === 'format') {
       if (this.style !== undefined) delete this.style;
       if (this.merge) delete this.merge;
@@ -149,11 +143,6 @@ class Cell {
     console.log('calc value from text', this);
     if (this.text === undefined) return;
 
-    // directParents = [];
-    dependencyLevel = 0;
-    cellWalkIdToDependencies = {};
-    cellWalkId = 0;
-
     cellStack = [];
 
     this.getFormulaParserCellValueFromText(this.text);
@@ -161,32 +150,25 @@ class Cell {
   }
 
   getFormulaParserCellValueFromText(src) {
-    console.log('dep', src, dependencyLevel);
-
-    // if (dependencyLevel == 1) {
-    //   directParents.push(this);
-    // }
-
     cellStack.push(this);
 
     if (this.updated) return this.value;
 
     if (isFormula(src)) {
-      dependencyLevel++;
-
       const parsedResult = formulaParser.parse(src.slice(1));
       console.log('parsed', src, ' -> ', parsedResult.result, cellStack);
 
       // !!!! THIS IS WHERE DEPENDENCIES COME FROM!
+      let newUses = [];
       while (this !== cellStack[cellStack.length - 1]) {
-        console.log('from ', src, ' removed ', cellStack.pop());
+        newUses.push(cellStack.pop());
       }
+      this.uses = newUses;
+      console.log(src, ' depends on ', this.uses);
 
       src = (parsedResult.error) ?
                 parsedResult.error :
                 parsedResult.result;
-
-      dependencyLevel--;
     }
 
     // The source string no longer contains a formula,

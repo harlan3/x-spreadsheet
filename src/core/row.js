@@ -2,10 +2,6 @@ import helper from './helper';
 import { Cell } from './cell';
 import { expr2expr, REGEX_EXPR_GLOBAL } from './alphabet';
 
-function getCellOrNewFromRowAndColumnIndex(row, ci) {
-  return row.cells[ci] || new Cell();
-}
-
 class Rows {
   constructor(dataProxy, { len, height }) {
     this._ = {};
@@ -91,18 +87,22 @@ class Rows {
 
   getCellOrNew(ri, ci) {
     const row = this.getOrNew(ri);
-    row.cells[ci] = getCellOrNewFromRowAndColumnIndex(row, ci);
+
+    if (row.cells[ci] === undefined) {
+      row.cells[ci] = new Cell(ri, ci);
+    }
+
     return row.cells[ci];
   }
 
   setCell(ri, ci, fieldInfo, what) {
     const cell = this.getCellOrNew(ri, ci);
-    cell.set(this.dataProxy, fieldInfo, what);
+    cell.set(fieldInfo, what);
   }
 
   setCellTextGivenCell(cell, text) {
     if (cell.editable !== false) {
-      cell.setText(this.dataProxy, text);
+      cell.setText(text);
     }
   }
 
@@ -147,7 +147,7 @@ class Rows {
                     n -= dn + 1;
                   }
                   if (text[0] === '=') {
-                    ncell.setText(this.dataProxy, text.replace(REGEX_EXPR_GLOBAL, (word) => {
+                    ncell.setText(text.replace(REGEX_EXPR_GLOBAL, (word) => {
                       let [xn, yn] = [0, 0];
                       if (sri === dsri) {
                         xn = n - 1;
@@ -168,7 +168,7 @@ class Rows {
                     // console.log('result:', result);
                     if (result !== null) {
                       const index = Number(result[0]) + n - 1;
-                      ncell.setText(this.dataProxy, text.substring(0, result.index) + index);
+                      ncell.setText(text.substring(0, result.index) + index);
                     }
                   }
                 }
@@ -318,18 +318,13 @@ class Rows {
         if (what === 'all') {
           delete row.cells[ci];
         } else {
-          cell.delete(this.dataProxy, what);
+          cell.delete(what);
         }
       }
     }
   }
 
   updateCellValues() {
-    // this.each((ri) => {
-    //   this.eachCells(ri, (ci, cell) => {
-    //     cell.visited = false;
-    //   });
-    // });
     // this.each((ri) => {
     //   this.eachCells(ri, (ci, cell) => {
     //     cell.calculateValueFromText();
