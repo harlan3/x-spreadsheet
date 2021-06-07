@@ -203,12 +203,19 @@ export default class Editor {
     }
   }
 
-  setCell(cell, validator) {
+  setCell(cell, validator, initialString = null) {
     // console.log('::', validator);
     const { el, datepicker, suggest } = this;
     el.show();
+
     this.cell = cell;
-    const text = (cell !== undefined) ? cell.getText() : '';
+
+    let text;
+    if (initialString !== null) {
+      text = initialString;
+    } else {
+      text = (cell) ? cell.getText() : '';
+    }
     this.setText(text);
 
     this.validator = validator;

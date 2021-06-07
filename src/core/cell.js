@@ -39,9 +39,7 @@ const getFormulaParserCellValueFromCoord = function(cellCoord) {
 
   const cellText = (cell) ? cell.getText() : '';
 
-  const val = getFormulaParserCellValueFromText(cellText);
-  console.log('cell for', cellCoord, cell, cellText, val);
-  return val;
+  return getFormulaParserCellValueFromText(cellText);
 }
 
 formulaParser.on('callCellValue', function(cellCoord, done) {
@@ -134,7 +132,7 @@ class Cell {
 
       // Call dataProxy, ask it to recalculate everything
       // TODO: Improve by only updating dependencies
-    dataProxy.updateCellValues();
+      dataProxy.rows.updateCellValues();
     } else if (what === 'format') {
       if (this.style !== undefined) delete this.style;
       if (this.merge) delete this.merge;

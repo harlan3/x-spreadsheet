@@ -985,6 +985,11 @@ export default class DataProxy {
   // state: input | finished
   setCellText(ri, ci, text, state) {
     const { rows, history, validations } = this;
+    // Only update the actual cell text on the 'finished' event; do nothing on
+    // the 'input' event. This avoids unnecessary spreadsheet recalculations
+    // while the user is editing a cell (triggered whenever the actual cell text
+    // is updated). The user will be able to see the text they are typing via
+    // the editor object rather than the cell.
     if (state === 'finished') {
       rows.setCellText(ri, ci, text);
       this.stopEditing();
@@ -992,8 +997,6 @@ export default class DataProxy {
       if (this.isStartEditing(ri, ci)) {
         history.add(this.getData());
       }
-      rows.setCellText(ri, ci, text);
-      this.change(this.getData());
     }
     // validator
     validations.validate(ri, ci, text);

@@ -435,11 +435,11 @@ function editorSetOffset() {
   editor.setOffset(sOffset, sPosition);
 }
 
-function editorSet() {
+function editorSet(initialString = null) {
   const { editor, data } = this;
   if (data.settings.mode === 'read') return;
   editorSetOffset.call(this);
-  editor.setCell(data.getSelectedCell(), data.getSelectedValidator());
+  editor.setCell(data.getSelectedCell(), data.getSelectedValidator(), initialString);
   clearClipboard.call(this);
 }
 
@@ -870,7 +870,9 @@ function sheetInitEvents() {
         || evt.key === '='
       ) {
         dataSetCellText.call(this, evt.key, 'input');
-        editorSet.call(this);
+
+        // Immediately open the editor initialized with the first keypress
+        editorSet.call(this, evt.key);
       } else if (keyCode === 113) {
         // F2
         editorSet.call(this);

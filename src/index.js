@@ -37,7 +37,9 @@ class Spreadsheet {
     this.sheet = new Sheet(rootEl, this.data);
     rootEl.child(this.bottombar.el);
 
-    // Necessary for formula interpretation
+    // For formula interpretation to work, we need to give the cell module a
+    // means to get cells via row and column indices. Assume indices are for
+    // the active sheet.
     configureCellLookupFunction((ri, ci) => {
       return this.sheet.table.data.getCell(ri, ci);
     });
