@@ -9,25 +9,6 @@ const isFormula = (src) => {
   return src.length > 0 && src[0] === '=';
 }
 
-const getFormulaParserCellValueFromText = (src) => {
-  // If cell contains a formula, recursively parse that formula to get the value
-  if (isFormula(src)) {
-    const parsedResult = formulaParser.parse(src.slice(1));
-
-    const recursedSrc = (parsedResult.error) ?
-            parsedResult.error :
-            parsedResult.result;
-
-    const parsedResultRecurse = getFormulaParserCellValueFromText(recursedSrc);
-    return parsedResultRecurse;
-  }
-
-  // The cell doesn't contain a formula, so return its contents as a value.
-  // If the string is a number, return as a number;
-  // otherwise, return as a string.
-  return Number(src) || src;
-};
-
 // Whenever formulaParser.parser encounters a cell reference, it will
 // execute this callback to query the true value of that cell reference.
 // If the referenced cell contains a formula, we need to use formulaParser
@@ -37,12 +18,13 @@ const getFormulaParserCellValueFromText = (src) => {
 const getFormulaParserCellValueFromCoord = function(cellCoord) {
   const cell = cellLookupFunction(cellCoord.row.index, cellCoord.column.index);
 
-  const cellText = (cell) ? cell.getText() : '';
+  if (!cell) return '';
 
-  return getFormulaParserCellValueFromText(cellText);
+  return cell.getFormulaParserCellValueFromText(cell.getText());
 }
 
 formulaParser.on('callCellValue', function(cellCoord, done) {
+  console.log('callCellValue', cellCoord);
   const cellValue = getFormulaParserCellValueFromCoord(cellCoord);
   done(cellValue);
 });
@@ -83,6 +65,9 @@ class Cell {
     // - merge
     // - editable
     this.set(dataProxy, properties);
+
+    this.deps = {};
+    this.visited = false;
   }
 
   setText(dataProxy, text) {
@@ -155,8 +140,34 @@ class Cell {
   calculateValueFromText() {
     if (this.text === undefined) return;
 
-    this.value = getFormulaParserCellValueFromText(this.text);
+    this.value = this.getFormulaParserCellValueFromText(this.text);
   }
+
+  getFormulaParserCellValueFromText(src) {
+    if (this.visited) return this.value;
+
+    let result;
+
+    // If cell contains a formula, recursively parse that formula to get the value
+    if (isFormula(src)) {
+      const parsedResult = formulaParser.parse(src.slice(1));
+
+      const recursedSrc = (parsedResult.error) ?
+              parsedResult.error :
+              parsedResult.result;
+
+      // parsed result from recursion
+      result = this.getFormulaParserCellValueFromText(recursedSrc);
+    } else {
+      // The cell doesn't contain a formula, so return its contents as a value.
+      // If the string is a number, return as a number;
+      // otherwise, return as a string.
+      result = Number(src) || src;
+    }
+
+    this.visited = true;
+    return result;
+  };
 }
 
 export default {
