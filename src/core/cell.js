@@ -5,8 +5,12 @@ const formulaParser = new Parser();
 let cellLookupFunction = (ri, ci) => { return null; };
 const configureCellLookupFunction = (fn) => { cellLookupFunction = fn; }
 
+let visitMap = {};
+let directParents = [];
+let dependencyLevel = 0;
+
 const isFormula = (src) => {
-  return src.length > 0 && src[0] === '=';
+  return src && src.length > 0 && src[0] === '=';
 }
 
 // Whenever formulaParser.parser encounters a cell reference, it will
@@ -55,6 +59,7 @@ formulaParser.on('callRangeValue', function (startCellCoord, endCellCoord, done)
 class Cell {
   constructor(dataProxy, properties) {
     this.value = null;
+    this.updated = true;
 
     if (dataProxy === undefined && properties === undefined)
       return;
@@ -67,7 +72,6 @@ class Cell {
     this.set(dataProxy, properties);
 
     this.deps = {};
-    this.visited = false;
   }
 
   setText(dataProxy, text) {
@@ -75,10 +79,12 @@ class Cell {
       return;
 
     this.text = text;
+    this.updated = false;
 
+    this.calculateValueFromText();
     // Call dataProxy, ask it to recalculate everything
     // TODO: Improve by only updating dependencies
-    dataProxy.rows.updateCellValues();
+    // dataProxy.rows.updateCellValues();
   }
 
   set(dataProxy, fieldInfo, what = 'all') {
@@ -114,6 +120,7 @@ class Cell {
     if (what === 'text') {
       if (this.text) delete this.text;
       if (this.value) delete this.value;
+      this.updated = true;
 
       // Call dataProxy, ask it to recalculate everything
       // TODO: Improve by only updating dependencies
@@ -138,35 +145,46 @@ class Cell {
   }
 
   calculateValueFromText() {
+    console.log('calc value from text', this);
     if (this.text === undefined) return;
 
-    this.value = this.getFormulaParserCellValueFromText(this.text);
+    directParents = [];
+    dependencyLevel = 0;
+
+    this.getFormulaParserCellValueFromText(this.text);
+    console.log('full stack', directParents);
   }
 
   getFormulaParserCellValueFromText(src) {
-    if (this.visited) return this.value;
+    console.log('dep', src, dependencyLevel);
 
-    let result;
-
-    // If cell contains a formula, recursively parse that formula to get the value
-    if (isFormula(src)) {
-      const parsedResult = formulaParser.parse(src.slice(1));
-
-      const recursedSrc = (parsedResult.error) ?
-              parsedResult.error :
-              parsedResult.result;
-
-      // parsed result from recursion
-      result = this.getFormulaParserCellValueFromText(recursedSrc);
-    } else {
-      // The cell doesn't contain a formula, so return its contents as a value.
-      // If the string is a number, return as a number;
-      // otherwise, return as a string.
-      result = Number(src) || src;
+    if (dependencyLevel == 1) {
+      directParents.push(this);
     }
 
-    this.visited = true;
-    return result;
+    if (this.updated) return this.value;
+
+    if (isFormula(src)) {
+      dependencyLevel++;
+
+      const parsedResult = formulaParser.parse(src.slice(1));
+      console.log('parsed', src, ' -> ', parsedResult.result);
+
+      src = (parsedResult.error) ?
+                parsedResult.error :
+                parsedResult.result;
+
+      dependencyLevel--;
+    }
+
+    // The source string no longer contains a formula,
+    // so return its contents as a value.
+    // If said string is a number, return as a number;
+    // otherwise, return as a string.
+    this.value = Number(src) || src;
+    this.updated = true;
+
+    return this.value;
   };
 }
 

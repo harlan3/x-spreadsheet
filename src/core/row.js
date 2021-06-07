@@ -325,16 +325,16 @@ class Rows {
   }
 
   updateCellValues() {
-    this.each((ri) => {
-      this.eachCells(ri, (ci, cell) => {
-        cell.visited = false;
-      });
-    });
-    this.each((ri) => {
-      this.eachCells(ri, (ci, cell) => {
-        cell.calculateValueFromText();
-      });
-    });
+    // this.each((ri) => {
+    //   this.eachCells(ri, (ci, cell) => {
+    //     cell.visited = false;
+    //   });
+    // });
+    // this.each((ri) => {
+    //   this.eachCells(ri, (ci, cell) => {
+    //     cell.calculateValueFromText();
+    //   });
+    // });
   }
 
   maxCell() {
