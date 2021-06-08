@@ -165,6 +165,7 @@ class Cell {
   }
 
   _getFormulaParserCellValueFromText(src) {
+    console.log('parsring', src, this.ri, this.ci);
     cellStack.push(this);
 
     if (this.updated) return this.value;
@@ -229,7 +230,11 @@ class Cell {
     // Iterate through this cell's registry of cells that use it and force them
     // to update.
     this.usedBy.forEach((columnMap, ri) => {
-      columnMap.forEach((cell, ci) => cell._getFormulaParserCellValueFromText());
+      columnMap.forEach((cell, ci) => {
+        // Force update
+        cell.updated = false;
+        cell._getFormulaParserCellValueFromText(cell.text);
+      });
     });
 
     return this.value;
