@@ -113,24 +113,35 @@ class Cell {
     return this.state.editable !== false;
   }
 
+  // Returns true if cell should be deleted at a higher level (row object)
   delete(what) {
+    // Can't delete if not editable, so return false
     if (!this.isEditable())
-      return;
+      return false;
 
     // Note: deleting the cell (what === 'all') needs to be handled at a
     // higher level (the row object).
-    if (what === 'text') {
-      if (this.state.text) delete this.state.text;
-      if (this.value) delete this.value;
-      this.updated = true;
+    const deleteAll = what === 'all';
 
-      // TODO: Update dependencies
-    } else if (what === 'format') {
+    if (what === 'text' || deleteAll) {
+      // if (this.state.text) delete this.state.text;
+      this.setText(undefined);
+
+      this.calculateValueFromText();
+    }
+    if (what === 'format' || deleteAll) {
       if (this.state.style !== undefined) delete this.state.style;
       if (this.state.merge) delete this.state.merge;
-    } else if (what === 'merge') {
+    }
+    if (what === 'merge' || deleteAll) {
       if (this.state.merge) delete this.state.merge;
     }
+
+    // Note: deleting the cell needs to be handled at a higher level (the row
+    // object). This should only be done if what === 'all' and this cell is
+    // not currently used by any other cells.
+    const shouldDelete = deleteAll && this.usedBy.size == 0;
+    return shouldDelete;
   }
 
   getText() {
@@ -205,9 +216,10 @@ class Cell {
 
     // The source string no longer contains a formula,
     // so return its contents as a value.
-    // If said string is a number, return as a number;
+    // Else if said string is a number, return as a number;
     // otherwise, return as a string.
-    this.value = Number(src) || src;
+    // Else (e.g., src is undefined), return an empty string.
+    this.value = Number(src) || src || '';
     this.updated = true;
 
     // ------------------------------------------------------------------------

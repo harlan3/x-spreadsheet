@@ -319,11 +319,8 @@ class Rows {
     if (row !== null) {
       const cell = this.getCell(ri, ci);
       if (cell && cell.isEditable()) {
-        if (what === 'all') {
-          delete row.cells[ci];
-        } else {
-          cell.delete(what);
-        }
+        const shouldDelete = cell.delete(what);
+        if (shouldDelete) delete row.cells[ci];
       }
     }
   }
