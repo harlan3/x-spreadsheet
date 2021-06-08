@@ -22,7 +22,7 @@ const getFormulaParserCellValueFromCoord = function(cellCoord) {
 
   if (!cell) return '';
 
-  return cell.getFormulaParserCellValueFromText(cell.getText());
+  return cell._getFormulaParserCellValueFromText(cell.getText());
 }
 
 formulaParser.on('callCellValue', function(cellCoord, done) {
@@ -60,6 +60,8 @@ class Cell {
     this.ci = ci;
     this.value = null;
     this.updated = true;
+    this.uses = [];
+    this.usedBy = new Map();
 
     if (properties === undefined)
       return;
@@ -70,8 +72,6 @@ class Cell {
     // - merge
     // - editable
     this.set(properties);
-
-    this.uses = [];
   }
 
   setText(text) {
@@ -145,30 +145,50 @@ class Cell {
 
     cellStack = [];
 
-    this.getFormulaParserCellValueFromText(this.text);
-    console.log('full stack', cellStack);
+    this._getFormulaParserCellValueFromText(this.text);
   }
 
-  getFormulaParserCellValueFromText(src) {
+  usedByCell(cell) {
+    // Create Map for row if none exists yet
+    if (!this.usedBy.has(cell.ri)) this.usedBy.set(cell.ri, new Map());
+
+    this.usedBy.get(cell.ri).set(cell.ci, cell);
+  }
+
+  noLongerUsedByCell(cell) {
+    if (!this.usedBy.has(cell.ri)) return;
+
+    this.usedBy.get(cell.ri).delete(cell.ci);
+
+    // Delete Map for row if now empty
+    if (this.usedBy.get(cell.ri).size == 0) this.usedBy.delete(cell.ri);
+  }
+
+  _getFormulaParserCellValueFromText(src) {
     cellStack.push(this);
 
     if (this.updated) return this.value;
+
+    // Copy of existing array of cells used by this formula;
+    // will be used to see how dependencies have changed.
+    let oldUses = this.uses.slice();
+    this.uses = [];
 
     if (isFormula(src)) {
       const parsedResult = formulaParser.parse(src.slice(1));
       console.log('parsed', src, ' -> ', parsedResult.result, cellStack);
 
-      // !!!! THIS IS WHERE DEPENDENCIES COME FROM!
-      let newUses = [];
-      while (this !== cellStack[cellStack.length - 1]) {
-        newUses.push(cellStack.pop());
-      }
-      this.uses = newUses;
-      console.log(src, ' depends on ', this.uses);
-
       src = (parsedResult.error) ?
                 parsedResult.error :
                 parsedResult.result;
+
+      // Store new dependencies of this cell by popping cells off the cell stack
+      // until this cell is reached.
+      while (this !== cellStack[cellStack.length - 1]) {
+        this.uses.push(cellStack.pop());
+      }
+
+      console.log(src, ' depends on ', this.uses);
     }
 
     // The source string no longer contains a formula,
@@ -177,6 +197,40 @@ class Cell {
     // otherwise, return as a string.
     this.value = Number(src) || src;
     this.updated = true;
+
+    // ------------------------------------------------------------------------
+    // Update cell reference dependencies and trigger update of dependent cells
+
+    // Build temporary weakmaps from the previous and current arrays of cells
+    // used by this cell's formula for faster determination of how those
+    // dependencies have changed (than comparing two arrays).
+    const oldUsesWeakMap = new WeakMap();
+    oldUses.forEach((cell) => oldUsesWeakMap.set(cell, true));
+
+    const usesWeakMap = new WeakMap();
+    this.uses.forEach((cell) => usesWeakMap.set(cell, true));
+
+    // Cells that this cell's formula previously used, but no longer does
+    const noLongerUses = oldUses.filter((cell) => !usesWeakMap.has(cell));
+
+    // Notify cells no longer in use that this cell no longer depends on
+    // them, and therefore doesn't need to be forced to update when they do.
+    noLongerUses.forEach((cell) => cell.noLongerUsedByCell(this));
+
+    // Cells that this cell's formula didn't previously use, but now does
+    const nowUses = this.uses.filter((cell) => !oldUsesWeakMap.has(cell));
+
+    // Notify cells now in use that this cell needs to be forced to update
+    // when they do.
+    nowUses.forEach((cell) => cell.usedByCell(this));
+
+    console.log('removed: ', noLongerUses, ' | added: ', nowUses);
+
+    // Iterate through this cell's registry of cells that use it and force them
+    // to update.
+    this.usedBy.forEach((columnMap, ri) => {
+      columnMap.forEach((cell, ci) => cell._getFormulaParserCellValueFromText());
+    });
 
     return this.value;
   };
