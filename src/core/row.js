@@ -138,16 +138,16 @@ class Rows {
               for (let jj = dsci; jj <= deci; jj += cn) {
                 const nri = ii + (i - sri);
                 const nci = jj + (j - sci);
-                const ncell = helper.cloneDeep(this._[i].cells[j]);
-                const ncellText = ncell.getText();
-                if (autofill && ncell && ncellText && ncellText.length > 0) {
-                  const { text } = ncell;
+                // Get copy of current state of the cell being copied,
+                // then modify before passing state to the destination cell.
+                const ncellState = this._[i].cells[j].getStateCopy();
+                if (autofill && ncellState && ncellState.text && ncellState.text.length > 0) {
                   let n = (jj - dsci) + (ii - dsri) + 2;
                   if (!isAdd) {
                     n -= dn + 1;
                   }
-                  if (text[0] === '=') {
-                    ncell.setText(text.replace(REGEX_EXPR_GLOBAL, (word) => {
+                  if (ncellState.text[0] === '=') {
+                    ncellState.text = ncellState.text.replace(REGEX_EXPR_GLOBAL, (word) => {
                       let [xn, yn] = [0, 0];
                       if (sri === dsri) {
                         xn = n - 1;
@@ -160,19 +160,23 @@ class Rows {
                       // Set expr2expr to not perform translation on axes with an
                       // absolute reference
                       return expr2expr(word, xn, yn, false);
-                    }));
+                    });
                   } else if ((rn <= 1 && cn > 1 && (dsri > eri || deri < sri))
                     || (cn <= 1 && rn > 1 && (dsci > eci || deci < sci))
                     || (rn <= 1 && cn <= 1)) {
-                    const result = /[\\.\d]+$/.exec(text);
+                    const result = /[\\.\d]+$/.exec(ncellState.text);
                     // console.log('result:', result);
                     if (result !== null) {
                       const index = Number(result[0]) + n - 1;
-                      ncell.setText(text.substring(0, result.index) + index);
+                      ncellState.text = ncellState.text.substring(0, result.index) + index;
                     }
                   }
                 }
-                this.setCell(nri, nci, ncell, what);
+                // Modify destination cell in-place, rather than replacing with
+                // a new cell, to avoid breaking existing update dependency
+                // maps to and from the destination cell.
+                const ncell = this.getCellOrNew(nri, nci);
+                ncell.set(ncellState);
                 cb(nri, nci, ncell);
               }
             }

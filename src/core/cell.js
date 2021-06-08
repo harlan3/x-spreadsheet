@@ -1,5 +1,7 @@
 import { Parser } from 'hot-formula-parser';
 
+import helper from './helper';
+
 const formulaParser = new Parser();
 
 let cellLookupFunction = (ri, ci) => { return null; };
@@ -58,10 +60,13 @@ class Cell {
   constructor(ri, ci, properties) {
     this.ri = ri;
     this.ci = ci;
-    this.value = null;
     this.updated = true;
     this.uses = [];
     this.usedBy = new Map();
+
+    // State contains what can be saved/restored
+    this.state = {};
+    this.value = undefined;
 
     if (properties === undefined)
       return;
@@ -78,7 +83,7 @@ class Cell {
     if (!this.isEditable())
       return;
 
-    this.text = text;
+    this.state.text = text;
     this.updated = false;
 
     this.calculateValueFromText();
@@ -93,19 +98,19 @@ class Cell {
         if (fieldName === 'text') {
           this.setText(fieldInfo.text);
         } else {
-          this[fieldName] = fieldInfo[fieldName];
+          this.state[fieldName] = fieldInfo[fieldName];
         }
       });
     } else if (what === 'text') {
       this.setText(fieldInfo.text);
     } else if (what === 'format') {
-      this.style = fieldInfo.style;
-      if (this.merge) this.merge = fieldInfo.merge;
+      this.state.style = fieldInfo.style;
+      if (this.state.merge) this.state.merge = fieldInfo.merge;
     }
   }
 
   isEditable() {
-    return this.editable !== false;
+    return this.state.editable !== false;
   }
 
   delete(what) {
@@ -115,25 +120,25 @@ class Cell {
     // Note: deleting the cell (what === 'all') needs to be handled at a
     // higher level (the row object).
     if (what === 'text') {
-      if (this.text) delete this.text;
+      if (this.state.text) delete this.state.text;
       if (this.value) delete this.value;
       this.updated = true;
 
       // TODO: Update dependencies
     } else if (what === 'format') {
-      if (this.style !== undefined) delete this.style;
-      if (this.merge) delete this.merge;
+      if (this.state.style !== undefined) delete this.state.style;
+      if (this.state.merge) delete this.state.merge;
     } else if (what === 'merge') {
-      if (this.merge) delete this.merge;
+      if (this.state.merge) delete this.state.merge;
     }
   }
 
   getText() {
-    return this.text || '';
+    return this.state.text || '';
   }
 
   getValue() {
-    if (isFormula(this.text))
+    if (isFormula(this.state.text))
       return this.value;
 
     return this.getText();
@@ -164,7 +169,7 @@ class Cell {
   }
 
   _recalculateCellValueFromText() {
-    let src = this.text;
+    let src = this.state.text;
 
     // Need to store here rather than later in the function in case calls to
     // formulaParser.parse cause resetDependencies to be modified
@@ -260,6 +265,10 @@ class Cell {
 
     return this.value;
   };
+
+  getStateCopy() {
+    return helper.cloneDeep(this.state);
+  }
 }
 
 export default {
