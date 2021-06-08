@@ -4,8 +4,8 @@ import helper from './helper';
 
 const formulaParser = new Parser();
 
-let cellLookupFunction = (ri, ci) => { return null; };
-const configureCellLookupFunction = (fn) => { cellLookupFunction = fn; }
+let cellGetOrNewFunction = (ri, ci) => { return null; };
+const configureCellGetOrNewFunction = (fn) => { cellGetOrNewFunction = fn; }
 
 let cellStack = [];
 let resetDependencies = false;
@@ -21,7 +21,7 @@ const isFormula = (src) => {
 // events to computer the values of its cell references. This recursion
 // will continue until the original formula is fully resolved.
 const getFormulaParserCellValueFromCoord = function(cellCoord) {
-  const cell = cellLookupFunction(cellCoord.row.index, cellCoord.column.index);
+  const cell = cellGetOrNewFunction(cellCoord.row.index, cellCoord.column.index);
 
   if (!cell) return '';
 
@@ -66,7 +66,7 @@ class Cell {
 
     // State contains what can be saved/restored
     this.state = {};
-    this.value = undefined;
+    this.value = '';
 
     if (properties === undefined)
       return;
@@ -115,6 +115,7 @@ class Cell {
 
   // Returns true if cell should be deleted at a higher level (row object)
   delete(what) {
+    console.log('delete', this, what);
     // Can't delete if not editable, so return false
     if (!this.isEditable())
       return false;
@@ -285,10 +286,10 @@ class Cell {
 
 export default {
   Cell: Cell,
-  configureCellLookupFunction: configureCellLookupFunction,
+  configureCellGetOrNewFunction: configureCellGetOrNewFunction,
 };
 
 export {
   Cell,
-  configureCellLookupFunction,
+  configureCellGetOrNewFunction,
 };

@@ -330,7 +330,7 @@ export default class DataProxy {
     this.freeze = [0, 0];
     this.styles = []; // Array<Style>
     this.merges = new Merges(); // [CellRange, ...]
-    this.rows = new Rows(this, this.settings.row);
+    this.rows = new Rows(this.settings.row);
     this.cols = new Cols(this.settings.col);
     this.validations = new Validations();
     this.hyperlinks = {};
@@ -588,6 +588,7 @@ export default class DataProxy {
 
   // state: input | finished
   setSelectedCellText(text, state = 'input') {
+    console.log('setSelectedCellText', text, state);
     const { autoFilter, selector, rows } = this;
     const { ri, ci } = selector;
     let nri = ri;
@@ -941,6 +942,10 @@ export default class DataProxy {
     return this.rows.getCell(ri, ci);
   }
 
+  getCellOrNew(ri, ci) {
+    return this.rows.getCellOrNew(ri, ci);
+  }
+
   getCellTextOrDefault(ri, ci) {
     const cell = this.getCell(ri, ci);
     if (!cell) return '';
@@ -984,6 +989,7 @@ export default class DataProxy {
 
   // state: input | finished
   setCellText(ri, ci, text, state) {
+    console.log('dp setCellText', ri, ci, text, state);
     const { rows, history, validations } = this;
     // Only update the actual cell text on the 'finished' event; do nothing on
     // the 'input' event. This avoids unnecessary spreadsheet recalculations

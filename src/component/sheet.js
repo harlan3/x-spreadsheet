@@ -487,6 +487,7 @@ function dataSetCellText(text, state = 'finished') {
   // const [ri, ci] = selector.indexes;
   if (data.settings.mode === 'read') return;
   data.setSelectedCellText(text, state);
+  console.log('selector', data.selector);
   const { ri, ci } = data.selector;
   if (state === 'finished') {
     table.render();

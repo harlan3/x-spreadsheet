@@ -1,7 +1,7 @@
 /* global window, document */
 import { h } from './component/element';
 import DataProxy from './core/data_proxy';
-import { configureCellLookupFunction } from './core/cell';
+import { configureCellGetOrNewFunction } from './core/cell';
 import Sheet from './component/sheet';
 import Bottombar from './component/bottombar';
 import { cssPrefix } from './config';
@@ -40,8 +40,13 @@ class Spreadsheet {
     // For formula interpretation to work, we need to give the cell module a
     // means to get cells via row and column indices. Assume indices are for
     // the active sheet.
-    configureCellLookupFunction((ri, ci) => {
-      return this.sheet.table.data.getCell(ri, ci);
+    // Need to use getCellOrNew rather than getCell because, if we are trying
+    // to evaluate the value for a referenced cell but the cell doesn't exist
+    // yet, we want a blank cell object to exist that we can map formula
+    // dependencies (so the referencing cell updates automatically when the
+    // referenced cell is given a non-blank value).
+    configureCellGetOrNewFunction((ri, ci) => {
+      return this.sheet.table.data.getCellOrNew(ri, ci);
     });
   }
 

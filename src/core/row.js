@@ -3,9 +3,8 @@ import { Cell } from './cell';
 import { expr2expr, REGEX_EXPR_GLOBAL } from './alphabet';
 
 class Rows {
-  constructor(dataProxy, { len, height }) {
+  constructor({ len, height }) {
     this._ = {};
-    this.dataProxy = dataProxy;
     this.len = len;
     // default row height
     this.height = height;
@@ -101,7 +100,8 @@ class Rows {
   }
 
   setCellTextGivenCell(cell, text) {
-    if (cell.editable !== false) {
+    console.log('setCellTextGivenCell', cell, text);
+    if (cell.isEditable()) {
       cell.setText(text);
     }
   }
@@ -226,7 +226,6 @@ class Rows {
           const cellText = cell.getText();
           if (cellText && cellText[0] === '=') {
             cell.setText(
-              this.dataProxy,
               cellText.replace(REGEX_EXPR_GLOBAL, word => expr2expr(word, 0, n, true, (x, y) => y >= sri))
             );
           }
@@ -251,7 +250,6 @@ class Rows {
           const cellText = cell.getText();
           if (cellText && cellText[0] === '=') {
             cell.setText(
-              this.dataProxy,
               cellText.replace(REGEX_EXPR_GLOBAL, word => expr2expr(word, 0, -n, true, (x, y) => y > eri))
             );
           }
@@ -272,7 +270,6 @@ class Rows {
           const cellText = cell.getText();
           if (cellText && cellText[0] === '=') {
             cell.setText(
-              this.dataProxy,
               cellText.replace(REGEX_EXPR_GLOBAL, word => expr2expr(word, n, 0, true, x => x >= sci))
             );
           }
@@ -296,7 +293,6 @@ class Rows {
           const cellText = cell.getText();
           if (cellText && cellText[0] === '=') {
             cell.setText(
-              this.dataProxy,
               cellText.replace(REGEX_EXPR_GLOBAL, word => expr2expr(word, -n, 0, true, x => x > eci))
             );
           }
