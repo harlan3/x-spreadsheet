@@ -6,6 +6,7 @@ let cellLookupFunction = (ri, ci) => { return null; };
 const configureCellLookupFunction = (fn) => { cellLookupFunction = fn; }
 
 let cellStack = [];
+let resetDependencies = false;
 
 const isFormula = (src) => {
   return src && src.length > 0 && src[0] === '=';
@@ -22,11 +23,10 @@ const getFormulaParserCellValueFromCoord = function(cellCoord) {
 
   if (!cell) return '';
 
-  return cell._getFormulaParserCellValueFromText(cell.getText());
+  return cell._recalculateCellValueFromText(cell.getText());
 }
 
 formulaParser.on('callCellValue', function(cellCoord, done) {
-  console.log('callCellValue', cellCoord);
   const cellValue = getFormulaParserCellValueFromCoord(cellCoord);
   done(cellValue);
 });
@@ -140,12 +140,11 @@ class Cell {
   }
 
   calculateValueFromText() {
-    console.log('calc value from text', this);
-    if (this.text === undefined) return;
-
     cellStack = [];
 
-    this._getFormulaParserCellValueFromText(this.text);
+    resetDependencies = true;
+    this._recalculateCellValueFromText();
+    resetDependencies = false;
   }
 
   usedByCell(cell) {
@@ -164,9 +163,17 @@ class Cell {
     if (this.usedBy.get(cell.ri).size == 0) this.usedBy.delete(cell.ri);
   }
 
-  _getFormulaParserCellValueFromText(src) {
-    console.log('parsring', src, this.ri, this.ci);
-    cellStack.push(this);
+  _recalculateCellValueFromText() {
+    let src = this.text;
+
+    // Need to store here rather than later in the function in case calls to
+    // formulaParser.parse cause resetDependencies to be modified
+    // let originalResetDependenciesState = resetDependencies;
+
+    // Only necessary if dependencies are being reset.
+    if (resetDependencies) {
+      cellStack.push(this);
+    }
 
     if (this.updated) return this.value;
 
@@ -177,19 +184,18 @@ class Cell {
 
     if (isFormula(src)) {
       const parsedResult = formulaParser.parse(src.slice(1));
-      console.log('parsed', src, ' -> ', parsedResult.result, cellStack);
 
       src = (parsedResult.error) ?
                 parsedResult.error :
                 parsedResult.result;
 
-      // Store new dependencies of this cell by popping cells off the cell stack
-      // until this cell is reached.
-      while (this !== cellStack[cellStack.length - 1]) {
-        this.uses.push(cellStack.pop());
+      if (resetDependencies) {
+        // Store new dependencies of this cell by popping cells off the cell stack
+        // until this cell is reached.
+        while (this !== cellStack[cellStack.length - 1]) {
+          this.uses.push(cellStack.pop());
+        }
       }
-
-      console.log(src, ' depends on ', this.uses);
     }
 
     // The source string no longer contains a formula,
@@ -202,40 +208,55 @@ class Cell {
     // ------------------------------------------------------------------------
     // Update cell reference dependencies and trigger update of dependent cells
 
-    // Build temporary weakmaps from the previous and current arrays of cells
-    // used by this cell's formula for faster determination of how those
-    // dependencies have changed (than comparing two arrays).
-    const oldUsesWeakMap = new WeakMap();
-    oldUses.forEach((cell) => oldUsesWeakMap.set(cell, true));
+    if (resetDependencies) {
+      // Build temporary weakmaps from the previous and current arrays of cells
+      // used by this cell's formula for faster determination of how those
+      // dependencies have changed (than comparing two arrays).
+      const oldUsesWeakMap = new WeakMap();
+      oldUses.forEach((cell) => oldUsesWeakMap.set(cell, true));
 
-    const usesWeakMap = new WeakMap();
-    this.uses.forEach((cell) => usesWeakMap.set(cell, true));
+      const usesWeakMap = new WeakMap();
+      this.uses.forEach((cell) => usesWeakMap.set(cell, true));
 
-    // Cells that this cell's formula previously used, but no longer does
-    const noLongerUses = oldUses.filter((cell) => !usesWeakMap.has(cell));
+      // Cells that this cell's formula previously used, but no longer does
+      const noLongerUses = oldUses.filter((cell) => !usesWeakMap.has(cell));
 
-    // Notify cells no longer in use that this cell no longer depends on
-    // them, and therefore doesn't need to be forced to update when they do.
-    noLongerUses.forEach((cell) => cell.noLongerUsedByCell(this));
+      // Notify cells no longer in use that this cell no longer depends on
+      // them, and therefore doesn't need to be forced to update when they do.
+      noLongerUses.forEach((cell) => cell.noLongerUsedByCell(this));
 
-    // Cells that this cell's formula didn't previously use, but now does
-    const nowUses = this.uses.filter((cell) => !oldUsesWeakMap.has(cell));
+      // Cells that this cell's formula didn't previously use, but now does
+      const nowUses = this.uses.filter((cell) => !oldUsesWeakMap.has(cell));
 
-    // Notify cells now in use that this cell needs to be forced to update
-    // when they do.
-    nowUses.forEach((cell) => cell.usedByCell(this));
+      // Notify cells now in use that this cell needs to be forced to update
+      // when they do.
+      nowUses.forEach((cell) => cell.usedByCell(this));
+    }
 
-    console.log('removed: ', noLongerUses, ' | added: ', nowUses);
-
+    // ------------------------------------------------------------------------
     // Iterate through this cell's registry of cells that use it and force them
-    // to update.
+    // to update their value, but change no dependencies.
+
+    // Dependencies should not be updated in these calls. This also keeps the
+    // cellStack unmodified by triggered updates.
+    let originalResetDependenciesState = resetDependencies;
+    resetDependencies = false;
+
     this.usedBy.forEach((columnMap, ri) => {
       columnMap.forEach((cell, ci) => {
         // Force update
         cell.updated = false;
-        cell._getFormulaParserCellValueFromText(cell.text);
+        cell._recalculateCellValueFromText();
       });
     });
+
+    // Restore original resetDependencies state.
+    // For cells in this.usedBy forced to recalculate, resetDependencies will
+    // restore to false ensuring that nothing in this.usedBy recalculates its
+    // dependencies.
+    // For cells parsed as a result of a calculateValueFromText call, this will
+    // restore to true ensuring that dependencies are updated.
+    resetDependencies = originalResetDependenciesState;
 
     return this.value;
   };
