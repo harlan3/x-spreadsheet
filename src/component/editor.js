@@ -7,6 +7,12 @@ import { cssPrefix } from '../config';
 import Formula from './formula';
 import { setCaretPosition, saveCaretPosition } from '../core/caret';
 
+// Must be undefined, not '', to differentiate between an empty string (such as
+// if use user types something, then deletes all characters) and a cell with no
+// value. If the user finishes an edit, but the resulting string is empty, this
+// should still fire a 'finished' event.
+const inputTextVoidValue = undefined;
+
 function insertText({ target }, itxt) {
   const { value, selectionEnd } = target;
   const ntxt = `${value.slice(0, selectionEnd)}${itxt}${value.slice(selectionEnd)}`;
@@ -136,7 +142,7 @@ export default class Editor {
     this.areaOffset = null;
     this.freeze = { w: 0, h: 0 };
     this.cell = null;
-    this.inputText = '';
+    this.inputText = inputTextVoidValue;
     this.change = () => { };
 
     this.formula = new Formula(this);
@@ -148,14 +154,14 @@ export default class Editor {
   }
 
   clear() {
-    // const { cell } = this;
-    // const cellText = (cell !== undefined) ? cell.getText() : '';
-    if (this.inputText !== '') {
+    // Fire finish editing event whenever the inputText has a non-void value,
+    // including if the string is empty.
+    if (this.inputText !== inputTextVoidValue) {
       this.change('finished', this.inputText);
     }
     this.cell = null;
     this.areaOffset = null;
-    this.inputText = '';
+    this.inputText = inputTextVoidValue;
     this.el.hide();
     this.textEl.val('');
     this.textlineEl.html('');
