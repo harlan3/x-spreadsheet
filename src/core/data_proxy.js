@@ -347,8 +347,7 @@ export default class DataProxy {
     this.exceptRowSet = new Set();
     this.sortedRowMap = new Map();
     this.unsortedRowMap = new Map();
-    this.currentEditRowIdx = null;
-    this.currentEditColIdx = null;
+    this.isEditing = false;
   }
 
   addValidation(mode, ref, validator) {
@@ -972,20 +971,6 @@ export default class DataProxy {
     return this.getCellStyleOrDefault(ri, ci);
   }
 
-  isStartEditing(rowIdx, colIdx) {
-    if (this.currentEditRowIdx === null && this.currentEditColIdx === null) {
-      this.currentEditRowIdx = rowIdx;
-      this.currentEditColIdx = colIdx;
-      return true;
-    }
-    return false;
-  }
-
-  stopEditing() {
-    this.currentEditRowIdx = null;
-    this.currentEditColIdx = null;
-  }
-
   // state: input | finished
   setCellText(ri, ci, text, state) {
     const { rows, history, validations } = this;
@@ -996,9 +981,10 @@ export default class DataProxy {
     // the editor object rather than the cell.
     if (state === 'finished') {
       rows.setCellText(ri, ci, text);
-      this.stopEditing();
+      this.isEditing = false;
     } else {
-      if (this.isStartEditing(ri, ci)) {
+      if (!this.isEditing) {
+        this.isEditing = true;
         history.add(this.getData());
       }
     }
