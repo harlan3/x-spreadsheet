@@ -588,7 +588,6 @@ export default class DataProxy {
 
   // state: input | finished
   setSelectedCellText(text, state = 'input') {
-    console.log('setSelectedCellText', text, state);
     const { autoFilter, selector, rows } = this;
     const { ri, ci } = selector;
     let nri = ri;
@@ -989,7 +988,6 @@ export default class DataProxy {
 
   // state: input | finished
   setCellText(ri, ci, text, state) {
-    console.log('dp setCellText', ri, ci, text, state);
     const { rows, history, validations } = this;
     // Only update the actual cell text on the 'finished' event; do nothing on
     // the 'input' event. This avoids unnecessary spreadsheet recalculations

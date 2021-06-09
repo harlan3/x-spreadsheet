@@ -115,7 +115,6 @@ class Cell {
 
   // Returns true if cell should be deleted at a higher level (row object)
   delete(what) {
-    console.log('delete', this, what);
     // Can't delete if not editable, so return false
     if (!this.isEditable())
       return false;
@@ -211,6 +210,25 @@ class Cell {
         // until this cell is reached.
         while (this !== cellStack[cellStack.length - 1]) {
           this.uses.push(cellStack.pop());
+        }
+
+        // For each dependency, see if it's in that dependency or its dependencies
+
+        // True if there's a circular dependency on this cell
+        const recursiveCircularDependencyCheck = (cellToCheckDependencies) => {
+          // A circular dependency is detected if either:
+          // - cellToCheckDependencies uses this cell
+          // - a cell used (recursively) by cellToCheckDependencies uses this cell
+          return cellToCheckDependencies.uses.some((cell) => {
+            if (cell === this) return true;
+
+            return recursiveCircularDependencyCheck(cell);
+          });
+        };
+        // console.log('has circ deps', recursiveCircularDependencyCheck(this));
+        if (recursiveCircularDependencyCheck(this)) {
+          console.log('circular!!!!!');
+          src = '#CIRCULAR';
         }
       }
     }

@@ -100,7 +100,6 @@ class Rows {
   }
 
   setCellTextGivenCell(cell, text) {
-    console.log('setCellTextGivenCell', cell, text);
     if (cell.isEditable()) {
       cell.setText(text);
     }
