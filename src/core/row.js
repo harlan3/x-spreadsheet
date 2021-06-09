@@ -367,6 +367,10 @@ class Rows {
     const data = {};
     data.len = this.len;
 
+    // Extract a copy of cell.state from the Cell objects, rather than
+    // returning the full Cell. This both reduces data storage needs and avoids
+    // any serialization problems with circular dependencies (which a Cell
+    // object may contain in cell.uses and cell.usedBy).
     Object.entries(this._).forEach(([ri, row]) => {
       data[ri] = { cells: {} };
 

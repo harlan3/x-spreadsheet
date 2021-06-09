@@ -1210,6 +1210,20 @@ export default class DataProxy {
       if (property === 'merges' || property === 'cols' || property === 'validations') {
         this[property].setData(d[property]);
       } else if (property === 'rows') {
+        // setData is used for initialization, undo, and redo functionality.
+        // We need to handle 3 cases which may occur considering the old and
+        // new cell data:
+        // (1) A cell which didn't previously exist needs to be created
+        //     -> Create a new cell and set its properties
+        // (2) A previously existing cell may be given a new value
+        //     -> Get the existing cell and set its properties
+        // (3) A previously existing cell needs to be removed
+        //     -> Don't include the previously existing cell in the update to
+        //        this.rows.setData.
+        //        !!!! ISSUE TO INVESTIGATE:
+        //             What if something depends on a cell that was removed?
+        //             It might not be garbage collected because other cells
+        //             will still have a reference to it.
         const rowsData = {};
         Object.entries(d.rows).forEach(([rowsProperty, rowsPropertyValue]) => {
           if (rowsProperty !== 'len') {
@@ -1219,6 +1233,7 @@ export default class DataProxy {
                 rowsData[rowsProperty] = { cells: {} };
               }
 
+              // Handle cases (1) and (2) above by using getCellOrNew
               const cell = this.getCellOrNew(rowsProperty, ci);
               cell.set(cellData);
               rowsData[rowsProperty].cells[ci] = cell;
@@ -1227,6 +1242,8 @@ export default class DataProxy {
             rowsData.len = rowsPropertyValue;
           }
         });
+        // Handles case (3) above, as rowsData only contains cells that will
+        // exist in the new state (unused cells are left out).
         this.rows.setData(rowsData);
       } else if (property === 'freeze') {
         const [x, y] = expr2xy(d[property]);
