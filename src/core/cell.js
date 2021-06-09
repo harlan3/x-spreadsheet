@@ -8,7 +8,7 @@ let cellGetOrNewFunction = (ri, ci) => { return null; };
 const configureCellGetOrNewFunction = (fn) => { cellGetOrNewFunction = fn; }
 
 let cellStack = [];
-let resetDependencies = false;
+// let resetDependencies = false;
 
 const isFormula = (src) => {
   return src && src.length > 0 && src[0] === '=';
@@ -158,9 +158,9 @@ class Cell {
   calculateValueFromText() {
     cellStack = [];
 
-    resetDependencies = true;
+    // resetDependencies = true;
     this._recalculateCellValueFromText();
-    resetDependencies = false;
+    // resetDependencies = false;
   }
 
   usedByCell(cell) {
@@ -187,9 +187,9 @@ class Cell {
     // let originalResetDependenciesState = resetDependencies;
 
     // Only necessary if dependencies are being reset.
-    if (resetDependencies) {
+    // if (resetDependencies) {
       cellStack.push(this);
-    }
+    // }
 
     if (this.updated) return this.value;
 
@@ -200,21 +200,17 @@ class Cell {
 
     if (isFormula(src)) {
       const parsedResult = formulaParser.parse(src.slice(1));
-
       src = (parsedResult.error) ?
                 parsedResult.error :
                 parsedResult.result;
 
-      if (resetDependencies) {
+      // if (resetDependencies) {
         // Store new dependencies of this cell by popping cells off the cell stack
         // until this cell is reached.
         while (this !== cellStack[cellStack.length - 1]) {
           this.uses.push(cellStack.pop());
         }
 
-        // For each dependency, see if it's in that dependency or its dependencies
-
-        // True if there's a circular dependency on this cell
         const recursiveCircularDependencyCheck = (cellToCheckDependencies) => {
           // A circular dependency is detected if either:
           // - cellToCheckDependencies uses this cell
@@ -225,12 +221,15 @@ class Cell {
             return recursiveCircularDependencyCheck(cell);
           });
         };
-        // console.log('has circ deps', recursiveCircularDependencyCheck(this));
-        if (recursiveCircularDependencyCheck(this)) {
-          console.log('circular!!!!!');
+
+        this.circular = recursiveCircularDependencyCheck(this);
+        if (this.circular) {
           src = '#CIRCULAR';
         }
-      }
+      // }
+    } else {
+      // Non-formulas can't be circular
+      this.circular = false;
     }
 
     // The source string no longer contains a formula,
@@ -244,7 +243,7 @@ class Cell {
     // ------------------------------------------------------------------------
     // Update cell reference dependencies and trigger update of dependent cells
 
-    if (resetDependencies) {
+    // if (resetDependencies) {
       // Build temporary weakmaps from the previous and current arrays of cells
       // used by this cell's formula for faster determination of how those
       // dependencies have changed (than comparing two arrays).
@@ -267,7 +266,7 @@ class Cell {
       // Notify cells now in use that this cell needs to be forced to update
       // when they do.
       nowUses.forEach((cell) => cell.usedByCell(this));
-    }
+    // }
 
     // ------------------------------------------------------------------------
     // Iterate through this cell's registry of cells that use it and force them
@@ -275,11 +274,18 @@ class Cell {
 
     // Dependencies should not be updated in these calls. This also keeps the
     // cellStack unmodified by triggered updates.
-    let originalResetDependenciesState = resetDependencies;
-    resetDependencies = false;
+    // let originalResetDependenciesState = resetDependencies;
+    // resetDependencies = false;
 
     this.usedBy.forEach((columnMap, ri) => {
       columnMap.forEach((cell, ci) => {
+        // If this cell is circular AND the next cell is circular, skip it to
+        // avoid infinite recursion.
+        // If the user edits a previously circular cell such that it is no
+        // longer circular (this.circular == false), recompute the cells it is
+        // used by to see if their circularity has been resolved.
+        if (this.circular && cell.circular) return;
+
         // Force update
         cell.updated = false;
         cell._recalculateCellValueFromText();
@@ -292,7 +298,7 @@ class Cell {
     // dependencies.
     // For cells parsed as a result of a calculateValueFromText call, this will
     // restore to true ensuring that dependencies are updated.
-    resetDependencies = originalResetDependenciesState;
+    // resetDependencies = originalResetDependenciesState;
 
     return this.value;
   };
