@@ -364,8 +364,18 @@ class Rows {
   }
 
   getData() {
-    const { len } = this;
-    return Object.assign({ len }, this._);
+    const data = {};
+    data.len = this.len;
+
+    Object.entries(this._).forEach(([ri, row]) => {
+      data[ri] = { cells: {} };
+
+      Object.entries(row.cells).forEach(([ci, cell]) => {
+        data[ri].cells[ci] = cell.getStateCopy();
+      });
+    });
+
+    return data;
   }
 }
 

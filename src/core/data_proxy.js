@@ -1193,19 +1193,41 @@ export default class DataProxy {
   }
 
   setData(d) {
+
+    // !!!!!!!!!!!!
+    // This is used not just in initialization, but also in undo/redo.
+    // We have the following cases to handle:
+    // - An existing cell has a new value
+    //    -> instead of creating a new cell, use getOrNew and then set its properties
+    // - A non-existent cell re-appears
+    //    -> also resolved by the above case (I think): use getOrNew and then set its properties
+    // - An existing cell no longer exists
+    //    -> it's not copied to the new rowsData...
+    //       this will break any existing dependencies on the cell, but they will be
+    //       recalculated anyways when/if the value is re-set
+
     Object.keys(d).forEach((property) => {
       if (property === 'merges' || property === 'cols' || property === 'validations') {
         this[property].setData(d[property]);
       } else if (property === 'rows') {
-        Object.keys(d.rows).forEach((rowsProperty) => {
+        const rowsData = {};
+        Object.entries(d.rows).forEach(([rowsProperty, rowsPropertyValue]) => {
           if (rowsProperty !== 'len') {
             // Map all cell JSON data into Cell objects
-            Object.keys(d.rows[rowsProperty].cells).forEach((columnIndex) => {
-              d.rows[rowsProperty].cells[columnIndex] = new Cell(rowsProperty, columnIndex, d.rows[rowsProperty].cells[columnIndex]);
+            Object.entries(rowsPropertyValue.cells).forEach(([ci, cellData]) => {
+              if (rowsData[rowsProperty] === undefined) {
+                rowsData[rowsProperty] = { cells: {} };
+              }
+
+              const cell = this.getCellOrNew(rowsProperty, ci);
+              cell.set(cellData);
+              rowsData[rowsProperty].cells[ci] = cell;
             });
+          } else {
+            rowsData.len = rowsPropertyValue;
           }
         });
-        this.rows.setData(d.rows);
+        this.rows.setData(rowsData);
       } else if (property === 'freeze') {
         const [x, y] = expr2xy(d[property]);
         this.freeze = [y, x];
