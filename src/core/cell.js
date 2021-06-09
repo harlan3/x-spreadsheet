@@ -83,6 +83,10 @@ class Cell {
     if (!this.isEditable())
       return;
 
+    // No reason to recompute if text is unchanged
+    if (this.state.text === text)
+      return;
+
     this.state.text = text;
     this.updated = false;
 
