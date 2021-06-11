@@ -7,8 +7,8 @@ const formulaParser = new Parser();
 let cellGetOrNewFunction = (ri, ci) => { return null; };
 const configureCellGetOrNewFunction = (fn) => { cellGetOrNewFunction = fn; }
 
-let cellStack = [];
-// let resetDependencies = false;
+let cellDependencies = [];
+let resetDependencies = false;
 
 const isFormula = (src) => {
   return src && src.length > 0 && src[0] === '=';
@@ -24,7 +24,9 @@ const isFormula = (src) => {
 const getCachedCellValueFromCoord = function(cellCoord) {
   const cell = cellGetOrNewFunction(cellCoord.row.index, cellCoord.column.index);
 
-  cellStack.push(cell);
+  if (resetDependencies) {
+    cellDependencies.push(cell);
+  }
 
   return cell.getValue();
 }
@@ -151,17 +153,13 @@ class Cell {
 
   getValue() {
     return this.value;
-    // if (isFormula(this.state.text))
-    //   return this.value;
-
-    // return this.getText();
   }
 
   updateValueFromTextInternal() {
     let src = this.state.text;
 
     if (isFormula(src)) {
-      // All dependent cells referenced are added to cellStack by the
+      // All dependent cells referenced are added to cellDependencies by the
       // callCellValue and callRangeValue event handlers
       const parsedResult = formulaParser.parse(src.slice(1));
       src = (parsedResult.error) ?
@@ -178,14 +176,16 @@ class Cell {
   }
 
   updateValueFromText() {
-    cellStack = [];
+    cellDependencies = [];
 
+    resetDependencies = true;
     this.updateValueFromTextInternal();
+    resetDependencies = false;
 
     // Copy of existing array of cells used by this formula;
     // will be used to see how dependencies have changed.
     let oldUses = new Set(this.uses);
-    this.uses = new Set(cellStack);
+    this.uses = new Set(cellDependencies);
 
     // ------------------------------------------------------------------------
     // Update cell reference dependencies
@@ -225,8 +225,6 @@ class Cell {
       // index to the end of the stack
       const indexOfCycleStart = dfsStack.indexOf(cell);
       if (indexOfCycleStart >= 0) {
-        console.log('circular!!!!!!!', indexOfCycleStart);
-
         const cellsInCycle = new Set(dfsStack.slice(indexOfCycleStart));
 
         // Visit/revisit all dependencies of current cell once and update their
@@ -239,17 +237,9 @@ class Cell {
 
           cycleDependentCell.value = (cellsInCycle.has(cycleDependentCell)) ? '#CIRCULAR-REF' : '#ERROR';
 
-          cycleDependentCell.usedBy.forEach((columnMap, ri) => {
-            columnMap.forEach((nextCell, ci) => updateValueInCycleAndDependencies(nextCell));
-          });
+          cycleDependentCell.forEachUsedBy((nextCell) => updateValueInCycleAndDependencies(nextCell));
         };
         updateValueInCycleAndDependencies(cell);
-
-        // TODO:
-        // Mark all cells from that point forward as cyclic
-        cellsInCycle.forEach((cell) => {
-          cell.value = '#CIRCULAR';
-        });
       }
 
       // If this cell has been visited before, return early to avoid both
@@ -260,22 +250,18 @@ class Cell {
       // Add to stack before recursion so dependent cells can include this cell
       // in their cycle check
       dfsStack.push(cell);
-      console.log('stack', dfsStack.map((cell) => cell.state.text));
       visitedMap.set(cell, true);
 
       // Iterate through all dependent cells,
       // trigger them to update the values of themselves and their dependencies.
-      cell.usedBy.forEach((columnMap, ri) => {
-        columnMap.forEach((dependentCell, ci) => {
-          console.log('dep cell', dependentCell.state.text);
-          // Trigger the cell to update; because if is using cached cell values
-          // rather than recalculating them, we don't have to worry about
-          // causing infinite recursion in case of cycles.
-          dependentCell.updateValueFromTextInternal();
+      cell.forEachUsedBy((dependentCell) => {
+        // Trigger the cell to update; because if is using cached cell values
+        // rather than recalculating them, we don't have to worry about
+        // causing infinite recursion in case of cycles.
+        dependentCell.updateValueFromTextInternal();
 
-          // Trigger the cell to update its own dependencies
-          updateDependenciesWithCycleCheck(dependentCell);
-        });
+        // Trigger the cell to update its own dependencies
+        updateDependenciesWithCycleCheck(dependentCell);
       });
 
       // Remove self from the stack
@@ -299,6 +285,14 @@ class Cell {
 
     // Delete Map for row if now empty
     if (this.usedBy.get(cell.ri).size == 0) this.usedBy.delete(cell.ri);
+  }
+
+  forEachUsedBy(functionUsingCell) {
+    this.usedBy.forEach((columnMap, ri) => {
+      columnMap.forEach((cell, ri) => {
+        functionUsingCell(cell);
+      });
+    });
   }
 
   getStateCopy() {
