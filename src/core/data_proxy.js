@@ -1179,19 +1179,6 @@ export default class DataProxy {
   }
 
   setData(d) {
-
-    // !!!!!!!!!!!!
-    // This is used not just in initialization, but also in undo/redo.
-    // We have the following cases to handle:
-    // - An existing cell has a new value
-    //    -> instead of creating a new cell, use getOrNew and then set its properties
-    // - A non-existent cell re-appears
-    //    -> also resolved by the above case (I think): use getOrNew and then set its properties
-    // - An existing cell no longer exists
-    //    -> it's not copied to the new rowsData...
-    //       this will break any existing dependencies on the cell, but they will be
-    //       recalculated anyways when/if the value is re-set
-
     Object.keys(d).forEach((property) => {
       if (property === 'merges' || property === 'cols' || property === 'validations') {
         this[property].setData(d[property]);
@@ -1204,33 +1191,36 @@ export default class DataProxy {
         // (2) A previously existing cell may be given a new value
         //     -> Get the existing cell and set its properties
         // (3) A previously existing cell needs to be removed
-        //     -> Don't include the previously existing cell in the update to
-        //        this.rows.setData.
-        //        !!!! ISSUE TO INVESTIGATE:
-        //             What if something depends on a cell that was removed?
-        //             It might not be garbage collected because other cells
-        //             will still have a reference to it.
-        const rowsData = {};
+        //     -> Go through all cells and request deletion (in a dependency-
+        //        safe way) of the cells which are no longer in use.
+
         Object.entries(d.rows).forEach(([rowsProperty, rowsPropertyValue]) => {
           if (rowsProperty !== 'len') {
             // Map all cell JSON data into Cell objects
             Object.entries(rowsPropertyValue.cells).forEach(([ci, cellData]) => {
-              if (rowsData[rowsProperty] === undefined) {
-                rowsData[rowsProperty] = { cells: {} };
-              }
 
               // Handle cases (1) and (2) above by using getCellOrNew
               const cell = this.getCellOrNew(rowsProperty, ci);
               cell.set(cellData);
-              rowsData[rowsProperty].cells[ci] = cell;
+
+              // Set temporary flag indicating the cell is used in the new data
+              cell.__tmp_isUsed = true;
             });
-          } else {
-            rowsData.len = rowsPropertyValue;
           }
         });
-        // Handles case (3) above, as rowsData only contains cells that will
-        // exist in the new state (unused cells are left out).
-        this.rows.setData(rowsData);
+
+        // Handles case (3) above
+        this.rows.each((ri) => {
+          this.rows.eachCells(ri, (ci, cell) => {
+            if (cell.__tmp_isUsed !== undefined) {
+              // Cell in use, remove temporary flag and leave cell as is
+              delete cell.__tmp_isUsed;
+            } else {
+              // Cell not in use, request deletion (in a dependency-safe way)
+              this.rows.deleteCell(ri, ci);
+            }
+          });
+        });
       } else if (property === 'freeze') {
         const [x, y] = expr2xy(d[property]);
         this.freeze = [y, x];

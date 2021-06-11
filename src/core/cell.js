@@ -102,10 +102,14 @@ class Cell {
       return;
 
     if (what === 'all') {
+      // Always update the text field, even if undefined (treated as an empty
+      // string). This allows a cell state to correctly update if it's state
+      // moves {text: 'some value'} to {}, such as can occur in undo/redo.
+      this.setText(fieldInfo.text);
+
+      // Update all other fields (besides text)
       Object.keys(fieldInfo).forEach((fieldName) => {
-        if (fieldName === 'text') {
-          this.setText(fieldInfo.text);
-        } else {
+        if (fieldName !== 'text') {
           this.state[fieldName] = fieldInfo[fieldName];
         }
       });
