@@ -220,17 +220,34 @@ class Cell {
     const visitedMap = new WeakMap();
 
     const updateDependenciesWithCycleCheck = (cell) => {
-      // BUG/TODO: if a cell uses a circular cell, its value also needs to be fixed
-
       // Check for cycles:
-      // If this cell is already in the dfsStack, there is a cycle from that
+      // If current cell is already in the dfsStack, there is a cycle from that
       // index to the end of the stack
       const indexOfCycleStart = dfsStack.indexOf(cell);
       if (indexOfCycleStart >= 0) {
         console.log('circular!!!!!!!', indexOfCycleStart);
+
+        const cellsInCycle = new Set(dfsStack.slice(indexOfCycleStart));
+
+        // Visit/revisit all dependencies of current cell once and update their
+        // values to reflect their relationship to the cycle.
+        const tempVisitedMap = new WeakMap();
+        const updateValueInCycleAndDependencies = (cycleDependentCell) => {
+          if (tempVisitedMap.has(cycleDependentCell)) return;
+
+          tempVisitedMap.set(cycleDependentCell, true);
+
+          cycleDependentCell.value = (cellsInCycle.has(cycleDependentCell)) ? '#CIRCULAR-REF' : '#ERROR';
+
+          cycleDependentCell.usedBy.forEach((columnMap, ri) => {
+            columnMap.forEach((nextCell, ci) => updateValueInCycleAndDependencies(nextCell));
+          });
+        };
+        updateValueInCycleAndDependencies(cell);
+
         // TODO:
         // Mark all cells from that point forward as cyclic
-        dfsStack.slice(indexOfCycleStart).forEach((cell) => {
+        cellsInCycle.forEach((cell) => {
           cell.value = '#CIRCULAR';
         });
       }
