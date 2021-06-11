@@ -14,13 +14,16 @@ const isFormula = (src) => {
   return src && src.length > 0 && src[0] === '=';
 }
 
-// TODO: update this doc?
 // Whenever formulaParser.parser encounters a cell reference, it will
 // execute this callback to query the true value of that cell reference.
-// If the referenced cell contains a formula, we need to use formulaParser
-// to determine its value---which will then trigger more callCellValue
-// events to computer the values of its cell references. This recursion
-// will continue until the original formula is fully resolved.
+// This function will *always* return the cached value of that cell reference
+// rather than recomputing it. Because only one cell can be modified/parsed at
+// a time and the rest were previously computed, there is no need to recompute
+// the value of the references. If the cell being parsed has a dependency
+// cycle, we avoid inifite recursion by using the cached value; this circular
+// dependency will be detected and addressed elsewhere (see
+// updateDependenciesWithCycleCheck).
+
 const getCachedCellValueFromCoord = function(cellCoord) {
   const cell = cellGetOrNewFunction(cellCoord.row.index, cellCoord.column.index);
 
