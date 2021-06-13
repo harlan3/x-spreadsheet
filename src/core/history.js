@@ -7,7 +7,6 @@ export default class History {
   }
 
   add(data) {
-    console.log('save point', data);
     this.undoItems.push(JSON.stringify(data));
     this.redoItems = [];
   }
@@ -23,7 +22,6 @@ export default class History {
   undo(currentd, cb) {
     const { undoItems, redoItems } = this;
     if (this.canUndo()) {
-      console.log('undo', currentd);
       redoItems.push(JSON.stringify(currentd));
       cb(JSON.parse(undoItems.pop()));
     }
@@ -32,7 +30,6 @@ export default class History {
   redo(currentd, cb) {
     const { undoItems, redoItems } = this;
     if (this.canRedo()) {
-      console.log('redo', currentd);
       undoItems.push(JSON.stringify(currentd));
       cb(JSON.parse(redoItems.pop()));
     }

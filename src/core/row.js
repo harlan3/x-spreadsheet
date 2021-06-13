@@ -1,6 +1,6 @@
 import helper from './helper';
-import { Cell } from './cell';
-import { expr2expr, REGEX_EXPR_GLOBAL } from './alphabet';
+import { Cell, isFormula } from './cell';
+import { expr2expr, expr2xy, xy2expr, REGEX_EXPR_GLOBAL } from './alphabet';
 
 class Rows {
   constructor({ len, height }) {
@@ -88,7 +88,7 @@ class Rows {
     const row = this.getOrNew(ri);
 
     if (row.cells[ci] === undefined) {
-      row.cells[ci] = new Cell(ri, ci);
+      row.cells[ci] = new Cell();
     }
 
     return row.cells[ci];
@@ -239,24 +239,58 @@ class Rows {
   delete(sri, eri) {
     const n = eri - sri + 1;
     const ndata = {};
+
+    // Step 1: Update all rows (delete or shift as needed) and cleanup
+    // relationships to cells in deleted rows.
     this.each((ri, row) => {
       const nri = parseInt(ri, 10);
       if (nri < sri) {
+        // Row is below deletion start index:
+        // Preserve row at same index as before
         ndata[nri] = row;
-      } else if (ri > eri) {
+      } else if (nri > eri) {
+        // Row is above deletion end index:
+        // Move row to new index offset by number of rows deleted
         ndata[nri - n] = row;
+      } else {
+        // Row is in deletion range:
+        // Remove the connection between all cells in these rows and the cells
+        // they depend on.
         this.eachCells(ri, (ci, cell) => {
-          const cellText = cell.getText();
-          if (cellText && cellText[0] === '=') {
-            cell.setText(
-              cellText.replace(REGEX_EXPR_GLOBAL, word => expr2expr(word, 0, -n, true, (x, y) => y > eri))
-            );
-          }
+          cell.uses.forEach((dependentCell) => dependentCell.noLongerUsedByCell(cell));
         });
       }
     });
+
     this._ = ndata;
     this.len -= n;
+
+    // Step 2: For all cells which remain, make the following adjustments to
+    // the cell references in their text string:
+    // - Any reference in the deleted range should be replaced with 'REF',
+    //   indicating a reference error
+    // - Any reference above the deleted range must be downshifted by the
+    //   number of deleted rows
+    this.each((ri, row) => {
+      this.eachCells(ri, (ci, cell) => {
+        const newCellText = cell.getText().replace(REGEX_EXPR_GLOBAL, word => {
+          const [x, y, xIsAbsolute, yIsAbsolute] = expr2xy(word);
+
+          if (y < sri) {
+            // Reference is before deleted range, no change needed
+            return word;
+          } else if (y > eri) {
+            // Reference is above deleted range, shift by n
+            return xy2expr(x, y - n, xIsAbsolute, yIsAbsolute);
+          }
+
+          // Reference is in deleted range, return reference error
+          return 'REF';
+        });
+
+        cell.setText(newCellText);
+      });
+    });
   }
 
   insertColumn(sci, n = 1) {
@@ -318,14 +352,6 @@ class Rows {
         if (shouldDelete) delete row.cells[ci];
       }
     }
-  }
-
-  updateCellValues() {
-    // this.each((ri) => {
-    //   this.eachCells(ri, (ci, cell) => {
-    //     cell.calculateValueFromText();
-    //   });
-    // });
   }
 
   maxCell() {

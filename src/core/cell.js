@@ -62,10 +62,16 @@ formulaParser.on('callRangeValue', function (startCellCoord, endCellCoord, done)
   done(fragment);
 });
 
+let lastCellId = 0;
+
 class Cell {
-  constructor(ri, ci, properties) {
-    this.ri = ri;
-    this.ci = ci;
+  constructor(properties) {
+    // cellId is used to identify a cell in the usedBy Map.
+    // We can't use the cell itself as a key in a WeakMap because WeakMaps are
+    // not iterable, and we need usedBy to be iterable.
+    lastCellId++;
+    this.cellId = lastCellId;
+
     this.uses = new Set();
     this.usedBy = new Map();
 
@@ -279,27 +285,15 @@ class Cell {
   }
 
   usedByCell(cell) {
-    // Create Map for row if none exists yet
-    if (!this.usedBy.has(cell.ri)) this.usedBy.set(cell.ri, new Map());
-
-    this.usedBy.get(cell.ri).set(cell.ci, cell);
+    this.usedBy.set(cell.id, cell);
   }
 
   noLongerUsedByCell(cell) {
-    if (!this.usedBy.has(cell.ri)) return;
-
-    this.usedBy.get(cell.ri).delete(cell.ci);
-
-    // Delete Map for row if now empty
-    if (this.usedBy.get(cell.ri).size == 0) this.usedBy.delete(cell.ri);
+    this.usedBy.delete(cell.id);
   }
 
   forEachUsedBy(functionUsingCell) {
-    this.usedBy.forEach((columnMap, ri) => {
-      columnMap.forEach((cell, ri) => {
-        functionUsingCell(cell);
-      });
-    });
+    this.usedBy.forEach((cell, cellId) => functionUsingCell(cell));
   }
 
   getStateCopy() {
@@ -310,9 +304,11 @@ class Cell {
 export default {
   Cell: Cell,
   configureCellGetOrNewFunction: configureCellGetOrNewFunction,
+  isFormula: isFormula,
 };
 
 export {
   Cell,
   configureCellGetOrNewFunction,
+  isFormula,
 };
