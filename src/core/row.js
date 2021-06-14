@@ -216,32 +216,48 @@ class Rows {
   }
 
   insert(sri, n = 1) {
+    // Step 1: Update all rows (shift as needed).
     const ndata = {};
+
     this.each((ri, row) => {
       let nri = parseInt(ri, 10);
-      if (nri >= sri) {
-        nri += n;
-        this.eachCells(ri, (ci, cell) => {
-          const cellText = cell.getText();
-          if (cellText && cellText[0] === '=') {
-            cell.setText(
-              cellText.replace(REGEX_EXPR_GLOBAL, word => expr2expr(word, 0, n, true, (x, y) => y >= sri))
-            );
-          }
-        });
+      if (nri < sri) {
+        // Row before insertion point:
+        // Preserve row at same index as before
+        ndata[nri] = row;
+      } else {
+        // Row is at/after insertion point:
+        // Move row to new index offset by number of rows inserted
+        ndata[nri + n] = row;
       }
-      ndata[nri] = row;
     });
+
     this._ = ndata;
     this.len += n;
+
+    // Step 2: For all cells which remain, make the following adjustments to
+    // the cell references in their text string:
+    // - Any reference after the insertion point must be downshifted by the
+    //   number of inserted rows
+    this.each((ri, row) => {
+      this.eachCells(ri, (ci, cell) => {
+        const cellText = cell.getText();
+        if (isFormula(cellText)) {
+          cell.setText(
+            cellText.replace(REGEX_EXPR_GLOBAL, word => expr2expr(word, 0, n, true, (x, y) => y >= sri))
+          );
+        }
+      });
+    });
   }
 
   delete(sri, eri) {
     const n = eri - sri + 1;
-    const ndata = {};
 
     // Step 1: Update all rows (delete or shift as needed) and cleanup
     // relationships to cells in deleted rows.
+    const ndata = {};
+
     this.each((ri, row) => {
       const nri = parseInt(ri, 10);
       if (nri < sri) {
@@ -273,15 +289,109 @@ class Rows {
     //   number of deleted rows
     this.each((ri, row) => {
       this.eachCells(ri, (ci, cell) => {
+        const cellText = cell.getText();
+        if (isFormula(cellText)) {
+          const newCellText = cellText.replace(REGEX_EXPR_GLOBAL, word => {
+            const [x, y, xIsAbsolute, yIsAbsolute] = expr2xy(word);
+
+            if (y < sri) {
+              // Reference is before deleted range, no change needed
+              return word;
+            } else if (y > eri) {
+              // Reference is after deleted range, shift by n
+              return xy2expr(x, y - n, xIsAbsolute, yIsAbsolute);
+            }
+
+            // Reference is in deleted range, return reference error
+            return 'REF';
+          });
+
+          cell.setText(newCellText);
+        }
+      });
+    });
+  }
+
+  insertColumn(sci, n = 1) {
+    // Step 1: Update all rows (shift as needed).
+    this.each((ri, row) => {
+      const rndata = {};
+      this.eachCells(ri, (ci, cell) => {
+        let nci = parseInt(ci, 10);
+        if (nci < sci) {
+          // Column before insertion point:
+          // Preserve column at same index as before
+          rndata[nci] = cell;
+        } else {
+          // Column is at/after insertion point:
+          // Move column to new index offset by number of columns inserted
+          rndata[nci + n] = cell;
+        }
+      });
+
+      row.cells = rndata;
+    });
+
+    // Step 2: For all cells which remain, make the following adjustments to
+    // the cell references in their text string:
+    // - Any reference after the insertion point must be rightshifted by the
+    //   number of inserted columns
+    this.each((ri, row) => {
+      this.eachCells(ri, (ci, cell) => {
+        const cellText = cell.getText();
+        if (isFormula(cellText)) {
+          cell.setText(
+            cellText.replace(REGEX_EXPR_GLOBAL, word => expr2expr(word, n, 0, true, x => x >= sci))
+          );
+        }
+      });
+    });
+  }
+
+  deleteColumn(sci, eci) {
+    const n = eci - sci + 1;
+
+    // Step 1: Update all columns (delete or shift as needed) and cleanup
+    // relationships to cells in deleted columns.
+    this.each((ri, row) => {
+      const rndata = {};
+      this.eachCells(ri, (ci, cell) => {
+        const nci = parseInt(ci, 10);
+        if (nci < sci) {
+          // Column is below deletion start index:
+          // Preserve column at same index as before
+          rndata[nci] = cell;
+        } else if (nci > eci) {
+          // Column is above deletion index:
+          // Move row to new index offset by number of columns deleted
+          rndata[nci - n] = cell;
+        } else {
+          // Column is in deletion range:
+          // Remove the connection between all cells in these columns and the cells
+          // they depend on.
+          cell.uses.forEach((dependentCell) => dependentCell.noLongerUsedByCell(cell));
+        }
+      });
+      row.cells = rndata;
+    });
+
+    // Step 2: For all cells which remain, make the following adjustments to
+    // the cell references in their text string:
+    // - Any reference in the deleted range should be replaced with 'REF',
+    //   indicating a reference error
+    // - Any reference above the deleted range must be leftshifted by the
+    //   number of deleted columns
+    this.each((ri, row) => {
+      this.eachCells(ri, (ci, cell) => {
         const newCellText = cell.getText().replace(REGEX_EXPR_GLOBAL, word => {
           const [x, y, xIsAbsolute, yIsAbsolute] = expr2xy(word);
 
-          if (y < sri) {
+          if (x < sci) {
             // Reference is before deleted range, no change needed
             return word;
-          } else if (y > eri) {
-            // Reference is above deleted range, shift by n
-            return xy2expr(x, y - n, xIsAbsolute, yIsAbsolute);
+          } else if (x > eci) {
+            // Reference is after deleted range, shift by n
+            return xy2expr(x - n, y, xIsAbsolute, yIsAbsolute);
           }
 
           // Reference is in deleted range, return reference error
@@ -290,48 +400,6 @@ class Rows {
 
         cell.setText(newCellText);
       });
-    });
-  }
-
-  insertColumn(sci, n = 1) {
-    this.each((ri, row) => {
-      const rndata = {};
-      this.eachCells(ri, (ci, cell) => {
-        let nci = parseInt(ci, 10);
-        if (nci >= sci) {
-          nci += n;
-          const cellText = cell.getText();
-          if (cellText && cellText[0] === '=') {
-            cell.setText(
-              cellText.replace(REGEX_EXPR_GLOBAL, word => expr2expr(word, n, 0, true, x => x >= sci))
-            );
-          }
-        }
-        rndata[nci] = cell;
-      });
-      row.cells = rndata;
-    });
-  }
-
-  deleteColumn(sci, eci) {
-    const n = eci - sci + 1;
-    this.each((ri, row) => {
-      const rndata = {};
-      this.eachCells(ri, (ci, cell) => {
-        const nci = parseInt(ci, 10);
-        if (nci < sci) {
-          rndata[nci] = cell;
-        } else if (nci > eci) {
-          rndata[nci - n] = cell;
-          const cellText = cell.getText();
-          if (cellText && cellText[0] === '=') {
-            cell.setText(
-              cellText.replace(REGEX_EXPR_GLOBAL, word => expr2expr(word, -n, 0, true, x => x > eci))
-            );
-          }
-        }
-      });
-      row.cells = rndata;
     });
   }
 
