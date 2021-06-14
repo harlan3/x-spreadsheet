@@ -46,6 +46,7 @@ export function indexAt(str) {
 // [4] Sequence of digits representing the row (Y), first digit cannot be 0
 export const REGEX_EXPR_GLOBAL                   = /[$]?[a-zA-Z]{1,3}[$]?[1-9][0-9]*/g;
 export const REGEX_EXPR_NONGLOBAL_AT_START       = /^[$]?[a-zA-Z]{1,3}[$]?[1-9][0-9]*/;
+export const REGEX_EXPR_RANGE_GLOBAL             = /[$]?[a-zA-Z]{1,3}[$]?[1-9][0-9]*:[$]?[a-zA-Z]{1,3}[$]?[1-9][0-9]*/g;
 export const REGEX_EXPR_RANGE_NONGLOBAL_AT_START = /^[$]?[a-zA-Z]{1,3}[$]?[1-9][0-9]*:[$]?[a-zA-Z]{1,3}[$]?[1-9][0-9]*/;
        const REGEX_EXPR_NONGLOBAL_CAPTURE        = /([$])?([a-zA-Z]{1,3})([$])?([1-9][0-9]*)/;
 
@@ -179,5 +180,6 @@ export default {
   expr2expr,
   REGEX_EXPR_GLOBAL,
   REGEX_EXPR_NONGLOBAL_AT_START,
+  REGEX_EXPR_RANGE_GLOBAL,
   REGEX_EXPR_RANGE_NONGLOBAL_AT_START,
 };

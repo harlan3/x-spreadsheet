@@ -1,6 +1,12 @@
 import helper from './helper';
 import { Cell, isFormula } from './cell';
-import { expr2expr, expr2xy, xy2expr, REGEX_EXPR_GLOBAL } from './alphabet';
+import {
+  expr2expr,
+  expr2xy,
+  xy2expr,
+  REGEX_EXPR_GLOBAL,
+  REGEX_EXPR_RANGE_GLOBAL,
+} from './alphabet';
 
 class Rows {
   constructor({ len, height }) {
@@ -283,15 +289,51 @@ class Rows {
 
     // Step 2: For all cells which remain, make the following adjustments to
     // the cell references in their text string:
-    // - Any reference in the deleted range should be replaced with 'REF',
-    //   indicating a reference error
-    // - Any reference above the deleted range must be downshifted by the
-    //   number of deleted rows
+    // - For ranges
+    //    - If the range is partly in the deleted zone, shift its start or end
+    //      to be outside the deleted zone
+    //    - If the range is fully in the deleted zone, return reference error
+    // - For single references
+    //    - Any reference in the deleted range should be replaced with 'REF',
+    //      indicating a reference error
+    //    - Any reference above the deleted range must be downshifted by the
+    //      number of deleted rows
+
     this.each((ri, row) => {
       this.eachCells(ri, (ci, cell) => {
         const cellText = cell.getText();
         if (isFormula(cellText)) {
-          const newCellText = cellText.replace(REGEX_EXPR_GLOBAL, word => {
+          // Adjust ranges
+          let newCellText = cellText.replace(REGEX_EXPR_RANGE_GLOBAL, word => {
+            const [rangeStart, rangeEnd] = word.split(':');
+            const [rangeStartX, rangeStartY, rangeStartXIsAbsolute, rangeStartYIsAbsolute] = expr2xy(rangeStart);
+            const [rangeEndX,   rangeEndY,   rangeEndXIsAbsolute,   rangeEndYIsAbsolute]   = expr2xy(rangeEnd);
+
+            const isRangeStartInDeletedZone = (rangeStartY >= sri) && (rangeStartY <= eri);
+            const isRangeEndInDeletedZone   = (rangeEndY   >= sri) && (rangeEndY   <= eri);
+
+            if (isRangeStartInDeletedZone && isRangeEndInDeletedZone) {
+              // Entire range is in deleted zone:
+              // Return reference error
+              return 'REF:REF';
+            } else if (isRangeStartInDeletedZone) {
+              // Just the start of the range is in the deleted zone:
+              // Shift start of range past the end index of the deleted zone.
+              const newRangeStart = xy2expr(rangeStartX, eri + 1, rangeStartXIsAbsolute, rangeStartYIsAbsolute);
+              return `${newRangeStart}:${rangeEnd}`;
+            } else if (isRangeEndInDeletedZone) {
+              // Just the end of the range is in the deleted zone:
+              // Shift end of the range before the start index of the deleted zone.
+              // Note: sri - 1 will never be negative because if sri == 0 and isRangeEndInDeletedZone,
+              // then isRangeStartInDeletedZone must also be true, returning 'REF:REF'.
+              const newRangeEnd = xy2expr(rangeEndX, sri - 1, rangeEndXIsAbsolute, rangeEndYIsAbsolute);
+              return `${rangeStart}:${newRangeEnd}`;
+            }
+
+            return word;
+          });
+          // Adjust single references (including start and end of ranges)
+          newCellText = newCellText.replace(REGEX_EXPR_GLOBAL, word => {
             const [x, y, xIsAbsolute, yIsAbsolute] = expr2xy(word);
 
             if (y < sri) {
@@ -383,22 +425,55 @@ class Rows {
     //   number of deleted columns
     this.each((ri, row) => {
       this.eachCells(ri, (ci, cell) => {
-        const newCellText = cell.getText().replace(REGEX_EXPR_GLOBAL, word => {
-          const [x, y, xIsAbsolute, yIsAbsolute] = expr2xy(word);
+        const cellText = cell.getText();
+        if (isFormula(cellText)) {
+          // Adjust ranges
+          let newCellText = cellText.replace(REGEX_EXPR_RANGE_GLOBAL, word => {
+            const [rangeStart, rangeEnd] = word.split(':');
+            const [rangeStartX, rangeStartY, rangeStartXIsAbsolute, rangeStartYIsAbsolute] = expr2xy(rangeStart);
+            const [rangeEndX,   rangeEndY,   rangeEndXIsAbsolute,   rangeEndYIsAbsolute]   = expr2xy(rangeEnd);
 
-          if (x < sci) {
-            // Reference is before deleted range, no change needed
+            const isRangeStartInDeletedZone = (rangeStartX >= sci) && (rangeStartX <= eci);
+            const isRangeEndInDeletedZone   = (rangeEndX   >= sci) && (rangeEndX   <= eci);
+
+            if (isRangeStartInDeletedZone && isRangeEndInDeletedZone) {
+              // Entire range is in deleted zone:
+              // Return reference error
+              return 'REF:REF';
+            } else if (isRangeStartInDeletedZone) {
+              // Just the start of the range is in the deleted zone:
+              // Shift start of range past the end index of the deleted zone.
+              const newRangeStart = xy2expr(eci + 1, rangeStartY, rangeStartXIsAbsolute, rangeStartYIsAbsolute);
+              return `${newRangeStart}:${rangeEnd}`;
+            } else if (isRangeEndInDeletedZone) {
+              // Just the end of the range is in the deleted zone:
+              // Shift end of the range before the start index of the deleted zone.
+              // Note: sci - 1 will never be negative because if sci == 0 and isRangeEndInDeletedZone,
+              // then isRangeStartInDeletedZone must also be true, returning 'REF:REF'.
+              const newRangeEnd = xy2expr(sci - 1, rangeEndY, rangeEndXIsAbsolute, rangeEndYIsAbsolute);
+              return `${rangeStart}:${newRangeEnd}`;
+            }
+
             return word;
-          } else if (x > eci) {
-            // Reference is after deleted range, shift by n
-            return xy2expr(x - n, y, xIsAbsolute, yIsAbsolute);
-          }
+          });
+          // Adjust single references (including start and end of ranges)
+          newCellText = newCellText.replace(REGEX_EXPR_GLOBAL, word => {
+            const [x, y, xIsAbsolute, yIsAbsolute] = expr2xy(word);
 
-          // Reference is in deleted range, return reference error
-          return 'REF';
-        });
+            if (x < sci) {
+              // Reference is before deleted range, no change needed
+              return word;
+            } else if (x > eci) {
+              // Reference is after deleted range, shift by n
+              return xy2expr(x - n, y, xIsAbsolute, yIsAbsolute);
+            }
 
-        cell.setText(newCellText);
+            // Reference is in deleted range, return reference error
+            return 'REF';
+          });
+
+          cell.setText(newCellText);
+        }
       });
     });
   }
