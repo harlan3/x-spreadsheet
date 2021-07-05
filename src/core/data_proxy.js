@@ -1184,43 +1184,40 @@ export default class DataProxy {
         this[property].setData(d[property]);
       } else if (property === 'rows') {
         // setData is used for initialization, undo, and redo functionality.
+        //
         // We need to handle 3 cases which may occur considering the old and
         // new cell data:
         // (1) A cell which didn't previously exist needs to be created
-        //     -> Create a new cell and set its properties
         // (2) A previously existing cell may be given a new value
-        //     -> Get the existing cell and set its properties
         // (3) A previously existing cell needs to be removed
-        //     -> Go through all cells and request deletion (in a dependency-
-        //        safe way) of the cells which are no longer in use.
+        //
+        // Handle all cases by creating new cells rather than attempting to
+        // update cells in-place.
+        //
+        // Though updating cells in-place could be more efficient, it also
+        // introduces significant complexity and opportunity for bugs in the
+        // undo/redo case. Therefore, we use an immutable approach.
 
+        const rowsData = {};
         Object.entries(d.rows).forEach(([rowsProperty, rowsPropertyValue]) => {
           if (rowsProperty !== 'len') {
             // Map all cell JSON data into Cell objects
             Object.entries(rowsPropertyValue.cells).forEach(([ci, cellData]) => {
+              if (rowsData[rowsProperty] === undefined) {
+                rowsData[rowsProperty] = { cells: {} };
+              }
 
-              // Handle cases (1) and (2) above by using getCellOrNew
               const cell = this.getCellOrNew(rowsProperty, ci);
               cell.set(cellData);
 
-              // Set temporary flag indicating the cell is used in the new data
-              cell.__tmp_isUsed = true;
+              rowsData[rowsProperty].cells[ci] = cell;
             });
+          } else {
+            rowsData.len = rowsPropertyValue;
           }
         });
 
-        // Handles case (3) above
-        this.rows.each((ri) => {
-          this.rows.eachCells(ri, (ci, cell) => {
-            if (cell.__tmp_isUsed !== undefined) {
-              // Cell in use, remove temporary flag and leave cell as is
-              delete cell.__tmp_isUsed;
-            } else {
-              // Cell not in use, request deletion (in a dependency-safe way)
-              this.rows.deleteCell(ri, ci);
-            }
-          });
-        });
+        this.rows.setData(rowsData);
       } else if (property === 'freeze') {
         const [x, y] = expr2xy(d[property]);
         this.freeze = [y, x];
