@@ -86,7 +86,7 @@ class Rows {
 
   getCellMerge(ri, ci) {
     const cell = this.getCell(ri, ci);
-    if (cell && cell.merge) return cell.merge;
+    if (cell && cell.state.merge) return cell.state.merge;
     return [0, 0];
   }
 

@@ -136,9 +136,9 @@ function copyPaste(srcCellRange, dstCellRange, what, autofill = false) {
     merges.deleteWithin(dstCellRange);
   }
   rows.copyPaste(srcCellRange, dstCellRange, what, autofill, (ri, ci, cell) => {
-    if (cell && cell.merge) {
+    if (cell && cell.state.merge) {
       // console.log('cell:', ri, ci, cell);
-      const [rn, cn] = cell.merge;
+      const [rn, cn] = cell.state.merge;
       if (rn <= 0 && cn <= 0) return;
       merges.add(new CellRange(ri, ci, ri + rn, ci + cn));
     }
@@ -215,8 +215,8 @@ function setStyleBorders({ mode, style, color }) {
         // jump merges -- end
         const cell = rows.getCell(ri, ci);
         let [rn, cn] = [0, 0];
-        if (cell && cell.merge) {
-          [rn, cn] = cell.merge;
+        if (cell && cell.state.merge) {
+          [rn, cn] = cell.state.merge;
           merges.push([ri, ci, rn, cn]);
         }
         const mrl = rn > 0 && ri + rn === eri;
@@ -714,8 +714,8 @@ export default class DataProxy {
       sri, sci, eri, eci,
     } = this.selector.range;
     const cell = this.getCell(sri, sci);
-    if (cell && cell.merge) {
-      const [rn, cn] = cell.merge;
+    if (cell && cell.state.merge) {
+      const [rn, cn] = cell.state.merge;
       if (sri + rn === eri && sci + cn === eci) return true;
     }
     return !this.selector.multiple();
@@ -726,8 +726,8 @@ export default class DataProxy {
       sri, sci, eri, eci,
     } = this.selector.range;
     const cell = this.getCell(sri, sci);
-    if (cell && cell.merge) {
-      const [rn, cn] = cell.merge;
+    if (cell && cell.state.merge) {
+      const [rn, cn] = cell.state.merge;
       if (sri + rn === eri && sci + cn === eci) return true;
     }
     return false;
@@ -742,7 +742,7 @@ export default class DataProxy {
       const { sri, sci } = selector.range;
       this.changeData(() => {
         const cell = rows.getCellOrNew(sri, sci);
-        cell.merge = [rn - 1, cn - 1];
+        cell.state.merge = [rn - 1, cn - 1];
         this.merges.add(selector.range);
         // delete merge cells
         this.rows.deleteCells(selector.range);
@@ -835,8 +835,8 @@ export default class DataProxy {
       }
       merges.shift(type, si, n, (ri, ci, rn, cn) => {
         const cell = rows.getCell(ri, ci);
-        cell.merge[0] += rn;
-        cell.merge[1] += cn;
+        cell.state.merge[0] += rn;
+        cell.state.merge[1] += cn;
       });
     });
   }
@@ -866,10 +866,10 @@ export default class DataProxy {
       merges.shift(type, si, -size, (ri, ci, rn, cn) => {
         // console.log('ri:', ri, ', ci:', ci, ', rn:', rn, ', cn:', cn);
         const cell = rows.getCell(ri, ci);
-        cell.merge[0] += rn;
-        cell.merge[1] += cn;
-        if (cell.merge[0] === 0 && cell.merge[1] === 0) {
-          delete cell.merge;
+        cell.state.merge[0] += rn;
+        cell.state.merge[1] += cn;
+        if (cell.state.merge[0] === 0 && cell.state.merge[1] === 0) {
+          delete cell.state.merge;
         }
       });
     });
@@ -915,9 +915,9 @@ export default class DataProxy {
     let width = cols.getWidth(ci);
     let height = rows.getHeight(ri);
     if (cell !== null) {
-      if (cell.merge) {
-        const [rn, cn] = cell.merge;
-        // console.log('cell.merge:', cell.merge);
+      if (cell.state.merge) {
+        const [rn, cn] = cell.state.merge;
+        // console.log('cell.state.merge:', cell.state.merge);
         if (rn > 0) {
           for (let i = 1; i <= rn; i += 1) {
             height += rows.getHeight(ri + i);
