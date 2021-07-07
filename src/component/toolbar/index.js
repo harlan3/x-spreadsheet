@@ -22,6 +22,7 @@ import Redo from './redo';
 import Undo from './undo';
 import Print from './print';
 import Textwrap from './textwrap';
+import Source from './source';
 import More from './more';
 
 import { h } from '../element';
@@ -129,6 +130,7 @@ export default class Toolbar {
         this.freezeEl = new Freeze(),
         this.autofilterEl = new Autofilter(),
         this.formulaEl = new Formula(),
+        this.sourceEL = new Source(),
         this.moreEl = new More(),
       ],
     ];

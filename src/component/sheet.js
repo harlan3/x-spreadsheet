@@ -352,6 +352,26 @@ function autofilter() {
   sheetReset.call(this);
 }
 
+function source() {
+  const { el, source, sourceTextArea } = this;
+   
+  if (this.mode == 0) {
+    el.css("display", "none");
+    source.css("display", "block");
+    sourceTextArea.val(JSON.stringify(this.data.getData()));
+    this.mode = 1;
+  } else {
+    el.css("display", "block");
+    source.css("display", "none");
+    this.data.setData(JSON.parse(sourceTextArea.val()));
+    sheetReset.call(this);
+    this.mode = 0;
+  }
+  
+  console.log('source called:');
+  
+}
+
 function toolbarChangePaintformatPaste() {
   const { toolbar } = this;
   if (toolbar.paintformatActive()) {
@@ -545,6 +565,9 @@ function toolbarChange(type, value) {
   } else if (type === 'autofilter') {
     // filter
     autofilter.call(this);
+  } else if (type === 'source') {
+    // source
+    source.call(this);
   } else if (type === 'freeze') {
     if (value) {
       const { ri, ci } = data.selector;
@@ -727,7 +750,7 @@ function sheetInitEvents() {
   bind(window, 'paste', (evt) => {
     if(!this.focusing) return;
     paste.call(this, 'all', evt);
-    evt.preventDefault();
+    //evt.preventDefault();
   });
 
   // for selector
@@ -886,9 +909,15 @@ export default class Sheet {
     this.eventMap = createEventEmitter();
     const { view, showToolbar, showContextmenu } = data.settings;
     this.el = h('div', `${cssPrefix}-sheet`);
+    this.mode = 0;
+    this.sourceTextArea = h('textarea', `${cssPrefix}-source-textarea`);
+    this.source = h('div', `${cssPrefix}-source`)
+      .children(
+        this.sourceTextArea,
+      );
     this.toolbar = new Toolbar(data, view.width, !showToolbar);
     this.print = new Print(data);
-    targetEl.children(this.toolbar.el, this.el, this.print.el);
+    targetEl.children(this.toolbar.el, this.el, this.source, this.print.el);
     this.data = data;
     // table
     this.tableEl = h('canvas', `${cssPrefix}-table`);

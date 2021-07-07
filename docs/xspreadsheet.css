@@ -14,6 +14,17 @@ body {
 .x-spreadsheet textarea {
   font: 400 13px Arial, 'Lato', 'Source Sans Pro', Roboto, Helvetica, sans-serif;
 }
+
+.x-spreadsheet-source {
+  display: none;
+}
+  
+.x-spreadsheet-source-textarea {
+  width: 98%;
+  height: 625px;
+  overflow-y: auto;
+}
+
 .x-spreadsheet-sheet {
   position: relative;
   overflow: hidden;
@@ -1034,6 +1045,11 @@ form fieldset select {
   left: -54px;
   top: -54px;
 }
+.x-spreadsheet-icon .x-spreadsheet-icon-img.source {
+  left: -180px;
+  top: -36px;
+}
+
 
 
 /*# sourceMappingURL=xspreadsheet.css.map*/

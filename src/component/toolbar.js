@@ -160,7 +160,8 @@ export default class Toolbar {
       this.freezeEl = buildButtonWithIcon(`${t('toolbar.freeze')}`, 'freeze', () => toggleChange.call(this, 'freeze')),
       this.autofilterEl = buildButtonWithIcon(`${t('toolbar.autofilter')}`, 'autofilter', () => toggleChange.call(this, 'autofilter')),
       buildButton(`${t('toolbar.formula')}`).child(this.ddFormula.el),
-      // buildDivider(),
+      buildDivider(),
+      this.sourceEL = buildButtonWithIcon(`${t('toolbar.source')}`, 'source', () => toggleChange.call(this, 'source')),
       this.moreEl = buildButton(`${t('toolbar.more')}`).child(this.ddMore.el).hide(),
     ];
     this.el = h('div', `${cssPrefix}-toolbar`);
@@ -214,6 +215,7 @@ export default class Toolbar {
     this.ddAlign.setTitle(style.align);
     this.ddVAlign.setTitle(style.valign);
     this.textwrapEl.active(style.textwrap);
+    this.sourceEL.active(style.source);
     // console.log('freeze is Active:', data.freezeIsActive());
     this.freezeEl.active(data.freezeIsActive());
     if (cell) {
